@@ -19,7 +19,7 @@ const MAX_PROGRESS_LENGTH = 300;
 export function sanitizedStemBase(name) {
   const base = basename(name, extname(name))
     .replace(/[^a-zA-Z0-9._-]+/g, '_')
-    .replace(/^\.+|\.+$/g, '')
+    .replace(/^[._-]+|[._-]+$/g, '')
     .slice(0, 48);
   return base || 'track';
 }
