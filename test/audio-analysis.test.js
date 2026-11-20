@@ -72,6 +72,7 @@ test('silence has a stable finite result and produces an actionable warning', ()
   assert.equal(silence.crestDb, 0);
   assert.equal(silence.centroidHz, 0);
   assert.ok(silence.bands.every((b) => b.percent === 0));
+  assert.ok(silence.spectrum.every((dB) => dB === -75), 'silence should draw as an empty spectrum');
   assert.ok(compareAudioProfiles(silence, analyze(440))[0].includes('near silent'));
 });
 
