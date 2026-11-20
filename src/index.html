@@ -44,6 +44,7 @@
   <nav class="tabs" role="tablist" aria-label="Sections">
     <button role="tab" id="tab-tone" aria-controls="panel-tone" aria-selected="true">Tone</button>
     <button role="tab" id="tab-library" aria-controls="panel-library" aria-selected="false" tabindex="-1">Presets</button>
+    <button role="tab" id="tab-analysis" aria-controls="panel-analysis" aria-selected="false" tabindex="-1">Analyze</button>
     <button role="tab" id="tab-tuner" aria-controls="panel-tuner" aria-selected="false" tabindex="-1">Tuner</button>
     <button role="tab" id="tab-console" aria-controls="panel-console" aria-selected="false" tabindex="-1">Console</button>
     <button role="tab" id="tab-capture" aria-controls="panel-capture" aria-selected="false" tabindex="-1">Capture</button>
@@ -128,6 +129,60 @@
       <p id="library-storage-warning" class="banner" hidden>This browser isn't letting the app store data, so saved presets will be lost when you close it. Export the ones you want to keep.</p>
       <ul id="library" class="library"></ul>
       <p id="library-empty" class="library-note">No saved presets yet. Use <strong>New</strong> or <strong>Save…</strong> on the Tone tab, or import a JSON file.</p>
+    </section>
+
+    <section id="panel-analysis" role="tabpanel" aria-labelledby="tab-analysis" hidden>
+      <div class="analysis-intro">
+        <h2>Compare guitar tone <span class="analysis-beta">Experimental</span></h2>
+        <p>Import a reference and your guitar recording, or record through a microphone/audio interface. Analyze matching eight-second sections and compare the frequency balance. Processing stays on this computer; no files are uploaded.</p>
+        <p class="hint">Prefer an isolated guitar stem or riff. Comparing a full song with a solo guitar also measures drums, bass and mastering, so it cannot identify the exact amp settings.</p>
+      </div>
+      <div class="analysis-sources">
+        <section class="analysis-source analysis-reference" aria-labelledby="analysis-reference-title">
+          <h3 id="analysis-reference-title"><span class="analysis-legend analysis-legend-ref"></span> Reference</h3>
+          <label for="analysis-reference-file">Load audio file (WAV, MP3 or browser-supported audio)</label>
+          <input type="file" id="analysis-reference-file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.flac">
+          <audio id="analysis-reference-player" controls preload="metadata" hidden aria-label="Reference playback"></audio>
+          <p id="analysis-reference-status" class="analysis-status" role="status">No reference selected</p>
+          <label for="analysis-reference-position">Analysis section starts at <output id="analysis-reference-start">0:00</output></label>
+          <input type="range" id="analysis-reference-position" min="0" max="0" step="0.5" value="0" disabled>
+        </section>
+        <section class="analysis-source analysis-guitar" aria-labelledby="analysis-guitar-title">
+          <h3 id="analysis-guitar-title"><span class="analysis-legend analysis-legend-guitar"></span> Your guitar</h3>
+          <label for="analysis-guitar-file">Load recorded guitar track</label>
+          <input type="file" id="analysis-guitar-file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.flac">
+          <label for="analysis-mic-select">Microphone or audio-interface input</label>
+          <div class="analysis-mic-row">
+            <select id="analysis-mic-select" aria-label="Audio recording input"><option value="">System default</option></select>
+            <button type="button" id="analysis-mic-refresh" title="Refresh available recording devices">Refresh inputs</button>
+          </div>
+          <div class="analysis-record-actions">
+            <button type="button" id="analysis-record-start" class="primary">Record guitar</button>
+            <button type="button" id="analysis-record-stop" disabled>Stop</button>
+            <span id="analysis-record-timer" aria-live="off">Up to 30 seconds</span>
+          </div>
+          <audio id="analysis-guitar-player" controls preload="metadata" hidden aria-label="Your guitar playback"></audio>
+          <p id="analysis-guitar-status" class="analysis-status" role="status">No guitar recording selected</p>
+          <label for="analysis-guitar-position">Analysis section starts at <output id="analysis-guitar-start">0:00</output></label>
+          <input type="range" id="analysis-guitar-position" min="0" max="0" step="0.5" value="0" disabled>
+        </section>
+      </div>
+      <section class="analysis-results" aria-label="Audio spectrum comparison">
+        <h3>Normalized spectrum</h3>
+        <p class="hint">Each curve is normalized to its own strongest frequency band. Compare shape, not absolute recording volume. A reference with drums and bass will not be guitar-only.</p>
+        <canvas id="analysis-spectrum" width="920" height="340" role="img" aria-label="Frequency spectrum comparison for reference and guitar"></canvas>
+        <div id="analysis-metrics" class="analysis-metrics" aria-live="polite"></div>
+        <h3>Frequency energy by band</h3>
+        <div class="analysis-table-wrap">
+          <table class="analysis-band-table">
+            <thead><tr><th scope="col">Band</th><th scope="col">Reference</th><th scope="col">Guitar</th><th scope="col">Difference</th></tr></thead>
+            <tbody id="analysis-band-body"></tbody>
+          </table>
+        </div>
+        <h3>What to try</h3>
+        <ul id="analysis-advice" class="analysis-advice"><li>Load both tracks to see comparison notes.</li></ul>
+      </section>
+      <p class="analysis-privacy">Audio and computed profiles are held in memory only. Closing the app clears them. Recording requires your explicit permission; it never starts automatically.</p>
     </section>
 
     <section id="panel-tuner" role="tabpanel" aria-labelledby="tab-tuner" hidden>
