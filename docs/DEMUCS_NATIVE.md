@@ -22,7 +22,10 @@ The original mix is not split into distinct players or individual guitar overdub
 - Model weights: `htdemucs_6s.safetensors`, approximately **84 MB**, fetched by demucs-rs at first use from `https://huggingface.co/set-soft/audio_separation/resolve/main/Demucs/` and cached locally by the upstream engine. Model weights are not included in this repository or distributed in the executable. Check the source and model terms separately.
 - The GUI is based on KindlingControl (GPL-3.0-or-later). These components remain independent; retain the original authors' notices and source links.
 
-The native engine is **not** installed via Python, pip or a shell script on the user's Windows PC. The experimental GitHub Actions workflow builds a pinned Rust revision and places `demucs.exe` in `extraResources` alongside the Electron application.
+The native engine is **not** installed via Python, pip or a shell script on the user's Windows PC. The preferred workflow, `.github/workflows/stems-portable-prebuilt.yml`, downloads the official Windows CLI artifact from the upstream release Actions run **39365873521**, artifact **12239537640**, for the pinned `v0.3.5` source commit. It verifies the SHA-256 of `demucs.exe` before bundling:
+`ec32ec6f00c9677bbed44a91fad453a9abf65a1dea520be0d32959a8ed937b02`.
+
+The official source-release workflow completed its Windows CLI build successfully even though its overall Release run failed on an unrelated macOS plugin job. The **manual fallback** `.github/workflows/stems-portable.yml` compiles the same pinned Rust revision directly with Vulkan SDK. Source compilation is expensive and is not run on every development push. The upstream Actions artifact may expire; in that case use the manual source-build workflow. Either workflow places the fixed native executable in Electron `extraResources` with the upstream Apache-2.0 license.
 
 ## Security and user data
 
