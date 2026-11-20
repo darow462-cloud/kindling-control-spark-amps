@@ -24,13 +24,11 @@ function idFrom(used, generator) {
   throw new Error('could not generate a unique ID for the imported item');
 }
 
-function sameTone(a, b) {
-  const normalize = (tone) => {
-    const json = presetToJson(tone);
-    delete json.PresetNumber; // library tones are not hardware slot assignments
-    return json;
-  };
-  return equal(normalize(a), normalize(b));
+function toneSignature(tone, metadata) {
+  const json = presetToJson(tone);
+  delete json.PresetNumber; // library tones are not hardware slot assignments
+  delete json.UUID; // imported copies get new IDs but still have the same tone
+  return JSON.stringify([json, normalizePresetMeta(metadata)]);
 }
 
 export function exportLibraryBackup(library, guitars, exportedAt = new Date().toISOString()) {
@@ -122,6 +120,9 @@ export function planLibraryBackupImport(input, library, guitars, generateId = ra
   }
 
   const newPresets = [];
+  // Skip exact content already present, including copies from an earlier
+  // backup import whose UUID was remapped to avoid a collision.
+  const existingSignatures = new Set(library.list().map((p) => toneSignature(p, p.metadata)));
   let copiedPresets = 0;
   let skippedPresets = 0;
   for (const entry of doc.presets) {
@@ -129,11 +130,12 @@ export function planLibraryBackupImport(input, library, guitars, generateId = ra
     const metadata = { ...entry.metadata };
     const linkedId = guitarMap.get(metadata.guitarProfileId) ?? metadata.guitarProfileId;
     metadata.guitarProfileId = usedGuitarIds.has(linkedId) ? linkedId : '';
-    const existing = library.get(preset.uuid);
-    if (existing && sameTone(existing, preset) && equal(library.metadata(preset.uuid), metadata)) {
+    const signature = toneSignature(preset, metadata);
+    if (existingSignatures.has(signature)) {
       skippedPresets++;
       continue;
     }
+    existingSignatures.add(signature);
     let uuid = preset.uuid;
     if (usedPresetIds.has(uuid)) {
       uuid = idFrom(usedPresetIds, generateId);
