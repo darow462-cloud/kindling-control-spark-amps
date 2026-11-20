@@ -1,0 +1,42 @@
+name: Spark 2 Windows Portable (test build)
+
+on:
+  push:
+    branches:
+      - fix/spark2-model-swap-fallback
+    paths:
+      - ".github/workflows/spark2-portable.yml"
+      - "src/**"
+      - "desktop/**"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portable:
+    name: Build standalone Windows exe
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build portable Windows exe
+        shell: pwsh
+        run: >
+          npx electron-builder --win portable --x64 --publish never
+          --config.extraMetadata.version=0.2.1-spark2fix.1
+          --config.productName="KindlingControl Spark2 Test"
+          --config.appId=dev.bluedog.kindlingcontrol.spark2test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KindlingControl-Spark2-Portable-Win-x64
+          path: dist/*.exe
+          if-no-files-found: error
+          retention-days: 14
