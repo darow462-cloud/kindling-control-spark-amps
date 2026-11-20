@@ -183,6 +183,7 @@ $('#connect').addEventListener('click', async () => {
     state.slot = info.presetNumber;
     highlightSlot();
     await refreshPreset();
+    resetToneSession();
   } catch (err) {
     console.error(err);
     reportError('connect', err);
@@ -222,6 +223,7 @@ function wireClient(c) {
     state.preset.pedals[i].params[index] = value;
     rig.updateParam(i, index, value);
     rig.flash(i);
+    if (!toneBusy) toneSession.capture(state.preset);
   });
   c.addEventListener('effectOnOff', (e) => {
     const { effect, on } = e.detail;
@@ -230,14 +232,18 @@ function wireClient(c) {
     state.preset.pedals[i].isOn = on;
     rig.setOnOff(i, on);
     rig.flash(i);
+    if (!toneBusy) toneSession.capture(state.preset);
   });
-  c.addEventListener('effectChanged', () => refreshPreset());
+  c.addEventListener('effectChanged', () => {
+    if (!toneBusy) refreshPreset();
+  });
   c.addEventListener('presetSelected', (e) => {
-    if (e.detail.solicited) return;
+    // Internal A/B and Undo operations select the temporary slot.
+    if (e.detail.solicited || (toneBusy && e.detail.slot === TEMP_SLOT)) return;
     state.slot = e.detail.slot;
     state.unsaved = false; // the amp moved on; the unsaved tone is gone
     highlightSlot();
-    refreshPreset();
+    refreshPreset().then(resetToneSession);
   });
   c.addEventListener('presetStored', (e) => logLine('rx', `amp stored current state to preset ${e.detail.slot + 1}`));
   c.addEventListener('tuner', (e) => showTuner(e.detail));
@@ -297,6 +303,7 @@ function refreshPreset() {
       if (!state.client) break;
       try {
         state.preset = await state.client.getPreset('current');
+        if (toneSession.available && !toneBusy) toneSession.capture(state.preset);
         renderPreset();
       } catch (err) {
         logLine('err', `could not read current preset: ${err.message}`);
@@ -332,13 +339,16 @@ for (const b of $$('.preset-buttons button')) {
 }
 
 async function selectSlot(slot) {
+  if (toneBusy) return;
   if (state.unsaved && !confirm('Your new preset is not saved yet. Switch presets anyway?')) return;
   try {
+    await flushToneWrites();
     await state.client.selectPreset(slot);
     state.slot = slot;
     state.unsaved = false;
     highlightSlot();
     await refreshPreset();
+    resetToneSession();
   } catch (err) {
     logLine('err', err.message);
     reportError('select-preset', err);
@@ -381,6 +391,8 @@ async function liveTone() {
 }
 
 async function makeLive(preset) {
+  if (toneBusy) return;
+  await flushToneWrites();
   if (state.connected) {
     await state.client.loadPreset(preset, TEMP_SLOT);
     state.slot = TEMP_SLOT;
@@ -390,6 +402,7 @@ async function makeLive(preset) {
     state.preset = structuredClone(preset);
     renderPreset();
   }
+  resetToneSession();
 }
 
 // ---- New ------------------------------------------------------------------
@@ -478,6 +491,7 @@ $('#save-dialog').addEventListener('close', async () => {
       state.preset = preset;
       renderPreset();
     }
+    resetToneSession();
   } catch (err) {
     logLine('err', `save failed: ${err.message}`);
     reportError('save-preset', err);
