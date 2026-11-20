@@ -19,6 +19,7 @@ import {
 } from '../spark/index.js';
 import { PresetLibrary } from './library.js';
 import { createRig } from './rig.js';
+import { ToneSession } from './tone-session.js';
 import { createReporter, detectApp, scrubLog } from './telemetry.js';
 import { VERSION } from '../version.js';
 
@@ -65,6 +66,78 @@ const state = {
   presetSlots: 4, // 8 on Spark 2
   mock: null,
 };
+
+// A and B each have independent, in-memory edit history. Nothing stored on the
+// amp changes until the user explicitly chooses a hardware slot in Save….
+const toneSession = new ToneSession();
+let toneBusy = false;
+
+function updateToneTools() {
+  const ready = !!state.preset && toneSession.available;
+  const bar = $('#tone-tools');
+  bar.hidden = !ready;
+  $('#tone-undo').disabled = !ready || toneBusy || !toneSession.canUndo;
+  $('#tone-redo').disabled = !ready || toneBusy || !toneSession.canRedo;
+  for (const side of ['A', 'B']) {
+    const b = $('#tone-' + side.toLowerCase());
+    b.disabled = !ready || toneBusy;
+    b.setAttribute('aria-pressed', String(toneSession.active === side));
+  }
+  $('#tone-copy').disabled = !ready || toneBusy;
+  $('#tone-copy').textContent = `Copy ${toneSession.active} → ${toneSession.active === 'A' ? 'B' : 'A'}`;
+  $('#rig').inert = toneBusy;
+}
+
+function resetToneSession() {
+  toneSession.reset(state.preset);
+  updateToneTools();
+}
+
+function recordToneEdit(key) {
+  if (!state.preset) return;
+  toneSession.record(state.preset, key);
+  state.unsaved = true;
+  renderPresetHeader();
+  updateToneTools();
+}
+
+/** Prevent trailing throttled parameter writes from altering the next live tone. */
+async function flushToneWrites() {
+  rig.flushPendingParams();
+  if (state.connected) await state.client.queue;
+}
+
+/**
+ * Restore an entire tone non-destructively: connected amps play the temporary
+ * slot 0x7F; no hardware preset is overwritten. Return the actual readback.
+ */
+async function restoreTone(target) {
+  if (toneBusy || !target || !state.preset) return null;
+  toneBusy = true;
+  updateToneTools();
+  try {
+    await flushToneWrites();
+    if (state.connected) {
+      await state.client.loadPreset(target, TEMP_SLOT);
+      state.preset = await state.client.getPreset('current');
+      state.slot = TEMP_SLOT;
+      highlightSlot();
+    } else {
+      state.preset = structuredClone(target);
+    }
+    state.unsaved = true;
+    renderPreset();
+    return structuredClone(state.preset);
+  } catch (err) {
+    logLine('err', `could not restore tone: ${err.message}`);
+    reportError('restore-tone', err);
+    toast(`Couldn't restore tone: ${err.message}. Press Refresh to resync if necessary.`, 'warn');
+    return null;
+  } finally {
+    toneBusy = false;
+    updateToneTools();
+  }
+}
 
 // ---------------------------------------------------------------------------
 // connection
