@@ -704,7 +704,7 @@ $('#tone-copy').addEventListener('click', () => {
 // Keep native text-input Undo behaviour. Shortcuts apply only when focus is
 // outside editable controls and do not affect the hardware's saved presets.
 document.addEventListener('keydown', (e) => {
-  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.target.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.target.closest?.('textarea, select, [contenteditable="true"], input:not([type="range"]):not([type="checkbox"])')) return;
   const k = e.key.toLowerCase();
   if (toneBusy || !state.preset) return;
   const redo = k === 'y' || (k === 'z' && e.shiftKey);
