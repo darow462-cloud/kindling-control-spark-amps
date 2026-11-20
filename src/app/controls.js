@@ -13,6 +13,14 @@ let uid = 0;
 // let long labels like "Limit/Compress" wrap at the slash rather than mid-word
 const wrapAtSlash = (text) => String(text).replace(/\//g, '/\u200b');
 
+/** Convert a typed 0–10 display value into the protocol's 0..1 range. */
+export function parseKnobValue(text) {
+  const raw = String(text).trim().replace(',', '.');
+  const n = raw ? Number(raw) : NaN;
+  if (!Number.isFinite(n)) return null;
+  return Math.round(Math.min(1, Math.max(0, n / 10)) * 1000) / 1000;
+}
+
 function svg(tag, attrs = {}) {
   const el = document.createElementNS(SVG_NS, tag);
   for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
@@ -108,14 +116,12 @@ export function createKnob({ label, value = 0, variant = 'pedal', onInput }) {
 
   // Enter an exact 0–10 value; the Spark protocol still receives 0..1.
   const commitNumber = () => {
-    const raw = numeric.value.trim().replace(',', '.');
-    const n = raw ? Number(raw) : NaN;
-    if (!Number.isFinite(n)) {
+    const v = parseKnobValue(numeric.value);
+    if (v == null) {
       numeric.value = String(Number((Number(input.value) * 10).toFixed(2)));
       return;
     }
     const old = Number(input.value);
-    const v = Math.round(Math.min(1, Math.max(0, n / 10)) * 1000) / 1000;
     set(v);
     numeric.value = String(Number((v * 10).toFixed(2)));
     if (v !== old) onInput(v);
