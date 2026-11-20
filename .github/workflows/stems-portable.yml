@@ -69,11 +69,15 @@ jobs:
           workspaces: demucs-rs -> target
           key: demucs-rs-v0.3.5-win-x64
 
+      # demucs-rs upstream's Windows release build requires the Vulkan SDK.
+      - name: Install Vulkan SDK (matching upstream Windows release)
+        uses: humbletim/install-vulkan-sdk@v1.2
+
       - name: Compile pinned six-stem native engine (Vulkan / wgpu)
         shell: pwsh
         working-directory: demucs-rs
         run: |
-          cargo build --release --locked -p demucs-cli
+          cargo build --release --locked -p demucs-cli --jobs 2
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Package native engine and its license
