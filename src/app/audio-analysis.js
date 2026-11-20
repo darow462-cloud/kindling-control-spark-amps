@@ -141,7 +141,9 @@ export function analyzePcm({
   }
   const averagePower = spectrumPower.map((v, i) => v / Math.max(1, spectrumCounts[i]));
   const strongest = Math.max(...averagePower, EPS);
-  const spectrum = Array.from(averagePower, (v) => Math.max(-75, 10 * Math.log10(Math.max(v, EPS) / strongest)));
+  const spectrum = strongest <= EPS
+    ? Array(SPECTRUM_POINTS).fill(-75) // never display silence as a flat 0 dB peak
+    : Array.from(averagePower, (v) => Math.max(-75, 10 * Math.log10(Math.max(v, EPS) / strongest)));
   return {
     sampleRate,
     startSec: start / sampleRate,
