@@ -1,17 +1,8 @@
 name: KindlingControl 0.6 Six Stems Windows Portable (experimental)
 
+# Manual fallback when the upstream v0.3.5 artifact has expired.
+# Source compilation is expensive; routine pushes use the verified prebuilt.
 on:
-  push:
-    branches:
-      - feature/v0.6-local-stem-separation
-    paths:
-      - ".github/workflows/stems-portable.yml"
-      - "desktop/**"
-      - "src/**"
-      - "test/**"
-      - "tools/make-stem-builder-config.js"
-      - "package.json"
-      - "package-lock.json"
   workflow_dispatch:
 
 permissions:
