@@ -118,7 +118,8 @@
           <h3>Undo, Redo and A/B comparison</h3>
           <p>The editing bar appears once a tone is loaded. <strong>Undo</strong> reverses your latest edits; <strong>Redo</strong> reapplies them. Quick movements of the same knob count as one step. Keyboard shortcuts are <kbd>Ctrl+Z</kbd> and <kbd>Ctrl+Y</kbd> (or <kbd>Ctrl+Shift+Z</kbd>); they do not override Undo while typing into a field.</p>
           <p><strong>A</strong> and <strong>B</strong> start as two copies of the loaded tone. Edit A, then switch to B and edit it separately; the two variants keep independent histories. <strong>Copy A → B</strong> (or <strong>Copy B → A</strong>) replaces the other variant with your current sound. Loading a new preset starts a fresh comparison.</p>
-          <p><strong>Safety:</strong> with an amp connected, switching A/B or using Undo/Redo uploads a full tone to the amp's temporary slot. It does not overwrite any of your saved hardware presets. Use <strong>Save…</strong> explicitly if you want to keep the sound. The A/B history is in memory only and does not persist after closing the app.</p>
+          <p><strong>Speed:</strong> when two tones use the same amp and pedal models, only changed knobs and switches are sent over Bluetooth. Switching models or altering the chain still requires a slower full-preset transfer.</p>
+          <p><strong>Safety:</strong> fast changes affect only the live sound, while complete restores use the temporary slot. Neither path overwrites stored hardware presets. Use <strong>Save…</strong> explicitly to keep the sound. Because fast knob commands are not acknowledged, press <strong>Refresh</strong> if the amp and screen disagree. A/B history is in memory only and does not persist after closing the app.</p>
         </section>
 
         <section id="signal-chain">
