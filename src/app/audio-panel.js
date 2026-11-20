@@ -66,13 +66,13 @@ export function initAudioPanel(root = document.getElementById('panel-analysis'))
     player.load();
   }
 
-  async function loadTrack(file, role) {
+  async function loadTrack(file, role, { maxBytes = MAX_AUDIO_FILE_BYTES, rethrow = false } = {}) {
     if (!file) return;
     const item = tracks[role];
     const requestId = ++item.loadId;
     try {
-      if (file.size > MAX_AUDIO_FILE_BYTES) {
-        throw new Error('File exceeds 40 MB. Use a shorter WAV/MP3 excerpt.');
+      if (file.size > maxBytes) {
+        throw new Error(`File exceeds ${Math.floor(maxBytes / (1024 * 1024))} MB. Use a shorter audio excerpt.`);
       }
       if (file.size === 0) throw new Error('The selected audio file is empty.');
       message(role, `Decoding ${file.name} locally…`);
@@ -95,7 +95,28 @@ export function initAudioPanel(root = document.getElementById('panel-analysis'))
       render();
     } catch (err) {
       if (requestId === item.loadId) message(role, `Could not analyze: ${err.message}`, true);
+      if (rethrow) throw err;
     }
+  }
+
+  async function loadSeparatedGuitar(stem) {
+    if (!stem || stem.name !== 'guitar' ||
+        !/^kindling-stem:\/\/[a-f0-9-]+\/guitar\.wav$/.test(stem.url)) {
+      throw new Error('Invalid generated guitar track address');
+    }
+    // Full WAV stems can be larger than imported MP3 files. Limit decoding to
+    // one trusted guitar stem at a time to avoid overwhelming the renderer.
+    const limit = 180 * 1024 * 1024;
+    const response = await fetch(stem.url);
+    if (!response.ok) throw new Error('Could not open the generated guitar WAV');
+    const expected = Number(response.headers.get('content-length'));
+    if (Number.isFinite(expected) && expected > limit) {
+      throw new Error('Guitar WAV is over 180 MB; use a shorter song for analysis.');
+    }
+    const blob = await response.blob();
+    if (blob.size > limit) throw new Error('Guitar WAV is over 180 MB; use a shorter song for analysis.');
+    await loadTrack(new File([blob], 'Separated guitar.wav', { type: 'audio/wav' }),
+      'reference', { maxBytes: limit, rethrow: true });
   }
 
   async function refreshInputs() {
@@ -363,5 +384,5 @@ export function initAudioPanel(root = document.getElementById('panel-analysis'))
     context?.close().catch(() => {});
   });
   render();
-  return { redraw: drawSpectrum };
+  return { redraw: drawSpectrum, loadSeparatedGuitar };
 }
