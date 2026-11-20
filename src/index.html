@@ -45,6 +45,7 @@
     <button role="tab" id="tab-tone" aria-controls="panel-tone" aria-selected="true">Tone</button>
     <button role="tab" id="tab-library" aria-controls="panel-library" aria-selected="false" tabindex="-1">Presets</button>
     <button role="tab" id="tab-analysis" aria-controls="panel-analysis" aria-selected="false" tabindex="-1">Analyze</button>
+    <button role="tab" id="tab-stems" aria-controls="panel-stems" aria-selected="false" tabindex="-1">Stems</button>
     <button role="tab" id="tab-tuner" aria-controls="panel-tuner" aria-selected="false" tabindex="-1">Tuner</button>
     <button role="tab" id="tab-console" aria-controls="panel-console" aria-selected="false" tabindex="-1">Console</button>
     <button role="tab" id="tab-capture" aria-controls="panel-capture" aria-selected="false" tabindex="-1">Capture</button>
@@ -129,6 +130,41 @@
       <p id="library-storage-warning" class="banner" hidden>This browser isn't letting the app store data, so saved presets will be lost when you close it. Export the ones you want to keep.</p>
       <ul id="library" class="library"></ul>
       <p id="library-empty" class="library-note">No saved presets yet. Use <strong>New</strong> or <strong>Save…</strong> on the Tone tab, or import a JSON file.</p>
+    </section>
+
+    <section id="panel-stems" role="tabpanel" aria-labelledby="tab-stems" hidden>
+      <h2>AI track separation <small>(Windows · experimental)</small></h2>
+      <p>Separate a song locally into <strong>drums, bass, vocals, guitar, piano and other instruments</strong> using HTDemucs 6-stem. Each result is saved as an individual WAV file that you can listen to or open in a DAW. No audio is sent to a cloud service.</p>
+      <div class="stem-notice">
+        <p><strong>Before the first run:</strong> the separation engine downloads about 84 MB of model weights from Hugging Face, then caches them locally. You need an internet connection for that first download; subsequent separations can use the cached model. A Vulkan-capable GPU is recommended. Long songs can require considerable memory and processing time.</p>
+        <p><strong>Limitations:</strong> guitar separation is approximate. In dense metal mixes, overlapping guitars, cymbals, vocals and distorted bass may bleed into other tracks. The six outputs are instrument categories, not guaranteed individual musicians or overdubs.</p>
+      </div>
+      <div id="stem-support-warning" class="banner" hidden>Native stem separation is currently provided only in the dedicated Windows Portable build. This browser/mobile build can still import an already separated WAV file into Analyze.</div>
+      <div class="stem-form">
+        <div class="stem-pick">
+          <button type="button" id="stem-select-file">Choose song…</button>
+          <span id="stem-file-label" class="stem-file-label">No audio file selected</span>
+        </div>
+        <div class="stem-pick">
+          <button type="button" id="stem-select-output">Choose output folder…</button>
+          <span id="stem-output-label" class="stem-file-label">No destination selected</span>
+        </div>
+        <div class="stem-actions">
+          <button type="button" class="primary" id="stem-start" disabled>Separate into 6 tracks</button>
+          <button type="button" id="stem-cancel" disabled>Cancel separation</button>
+        </div>
+        <progress id="stem-progress" max="100" hidden></progress>
+        <p id="stem-status" class="stem-status" role="status" aria-live="polite">Select a song and an output folder to begin.</p>
+      </div>
+      <div id="stem-results" hidden>
+        <h3>Separated tracks</h3>
+        <p class="hint">Use Play to audition each stem, or open the output folder to use all six WAVs in another editor. Select <strong>Analyze guitar</strong> to compare the isolated guitar stem with your recording. Tracks are approximate AI estimates.</p>
+        <div id="stem-track-list" class="stem-track-list"></div>
+        <div class="stem-actions">
+          <button type="button" id="stem-open-folder">Open WAV output folder</button>
+          <button type="button" id="stem-analyze-guitar">Analyze guitar stem</button>
+        </div>
+      </div>
     </section>
 
     <section id="panel-analysis" role="tabpanel" aria-labelledby="tab-analysis" hidden>
