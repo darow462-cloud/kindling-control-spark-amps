@@ -20,6 +20,7 @@ import {
 import { PresetLibrary } from './library.js';
 import { createRig } from './rig.js';
 import { ToneSession } from './tone-session.js';
+import { planToneDelta } from './tone-diff.js';
 import { createReporter, detectApp, scrubLog } from './telemetry.js';
 import { VERSION } from '../version.js';
 
@@ -119,12 +120,34 @@ async function restoreTone(target) {
   toneBusy = true;
   updateToneTools();
   try {
+    // Wait for any final parameter writes from the previous knob drag. Sending
+    // a fast restore before those writes complete would restore an old value.
     await flushToneWrites();
     if (state.connected) {
-      await state.client.loadPreset(target, TEMP_SLOT);
-      state.preset = await state.client.getPreset('current');
-      state.slot = TEMP_SLOT;
-      highlightSlot();
+      const steps = planToneDelta(state.preset, target);
+      if (steps !== null) {
+        // Fast path: 01 04 sends individual scalar parameters, 01 15 toggles
+        // effect on/off. Both modify only the live tone, not stored presets.
+        // 01 04 has no ACK; relying on its write completion is consistent with
+        // ordinary knob editing. Refresh remains available to verify readback.
+        for (const step of steps) {
+          if (step.kind === 'param') {
+            await state.client.setParam(step.effect, step.index, step.value);
+          } else {
+            await state.client.setEffectOnOff(step.effect, step.on);
+          }
+        }
+        state.preset = structuredClone(target);
+        logLine('info', `fast tone restore: ${steps.length} direct change(s)`);
+      } else {
+        // A model/chain/metadata change (or many changes) still needs a full
+        // preset upload followed by a readback to verify what the amp kept.
+        await state.client.loadPreset(target, TEMP_SLOT);
+        state.preset = await state.client.getPreset('current');
+        state.slot = TEMP_SLOT;
+        highlightSlot();
+        logLine('info', 'full tone restore: temporary preset');
+      }
     } else {
       state.preset = structuredClone(target);
     }
@@ -134,6 +157,17 @@ async function restoreTone(target) {
   } catch (err) {
     logLine('err', `could not restore tone: ${err.message}`);
     reportError('restore-tone', err);
+    // A partially completed command sequence could have changed the amp.
+    // Read back its actual state and invalidate stale Undo/Redo snapshots.
+    if (state.connected) {
+      try {
+        state.preset = await state.client.getPreset('current');
+        resetToneSession();
+        renderPreset();
+      } catch (readError) {
+        logLine('err', `could not resync after failed tone restore: ${readError.message}`);
+      }
+    }
     toast(`Couldn't restore tone: ${err.message}. Press Refresh to resync if necessary.`, 'warn');
     return null;
   } finally {
