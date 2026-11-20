@@ -52,7 +52,7 @@ export class PresetLibrary extends EventTarget {
   }
 
   /** Add/replace a tone while retaining its metadata unless explicitly supplied. */
-  save(preset, metadata = undefined) {
+  save(preset, metadata = undefined, { savedAt = Date.now() } = {}) {
     if (!preset.uuid) throw new Error('preset needs a uuid');
     const json = presetToJson({ ...preset, slot: null });
     delete json.PresetNumber;
@@ -60,7 +60,7 @@ export class PresetLibrary extends EventTarget {
     const old = i >= 0 ? this.items[i] : null;
     const entry = {
       json,
-      savedAt: Date.now(),
+      savedAt: Number.isFinite(savedAt) && savedAt > 0 ? savedAt : Date.now(),
       metadata: normalizePresetMeta(metadata === undefined ? old?.metadata : metadata),
     };
     if (i >= 0) this.items[i] = entry;
