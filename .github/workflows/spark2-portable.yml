@@ -1,9 +1,9 @@
-name: KindlingControl 0.4.1 Windows Portable (test build)
+name: KindlingControl 0.5 Windows Portable (test build)
 
 on:
   push:
     branches:
-      - feature/v0.4.1-library-backup
+      - feature/v0.5-local-tone-analysis
     paths:
       - ".github/workflows/spark2-portable.yml"
       - "src/**"
@@ -30,18 +30,27 @@ jobs:
         run: npm ci
       - name: Run tests
         run: npm test
+      - name: Check renderer syntax
+        shell: pwsh
+        run: |
+          node --check src/app/app.js
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          node --check src/app/audio-panel.js
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          node --check src/app/audio-analysis.js
+          if ($LASTEXITCODE -ne 0) { exit 1 }
       - name: Stamp development build version
-        run: node tools/stamp-version.js 0.4.1-backup.1
+        run: node tools/stamp-version.js 0.5.0-analysis.1
       - name: Build portable Windows exe
         shell: pwsh
         run: >
           npx electron-builder --win portable --x64 --publish never
-          --config.extraMetadata.version=0.4.1-backup.1
-          --config.productName="KindlingControl Library 0.4 Test"
-          --config.appId=dev.bluedog.kindlingcontrol.library04
+          --config.extraMetadata.version=0.5.0-analysis.1
+          --config.productName="KindlingControl Tone Analysis 0.5 Test"
+          --config.appId=dev.darow462.kindlingcontrol.analysis05
       - uses: actions/upload-artifact@v4
         with:
-          name: KindlingControl-Library041-Portable-Win-x64
+          name: KindlingControl-Analysis05-Portable-Win-x64
           path: dist/*.exe
           if-no-files-found: error
           retention-days: 14
