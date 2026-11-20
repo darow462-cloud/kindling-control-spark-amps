@@ -109,6 +109,20 @@
         <button type="button" id="export-current" disabled>Export current tone</button>
         <button type="button" class="help-link" data-help="library" aria-label="Help: the Presets tab">?</button>
       </div>
+      <div class="library-organizer" role="search" aria-label="Find saved tones">
+        <label>Search
+          <input type="search" id="library-search" placeholder="Preset, artist, song, tag…" autocomplete="off">
+        </label>
+        <label>Artist
+          <select id="library-artist-filter" aria-label="Filter by artist"><option value="">All artists</option></select>
+        </label>
+        <label>Guitar
+          <select id="library-guitar-filter" aria-label="Filter by guitar"><option value="">All guitars</option></select>
+        </label>
+        <label class="favorite-filter"><input type="checkbox" id="library-favorites-only"> ★ Favorites</label>
+        <button type="button" id="guitars-open">Guitar profiles…</button>
+      </div>
+      <p id="library-results" class="library-results" aria-live="polite"></p>
       <p id="library-storage-warning" class="banner" hidden>This browser isn't letting the app store data, so saved presets will be lost when you close it. Export the ones you want to keep.</p>
       <ul id="library" class="library"></ul>
       <p id="library-empty" class="library-note">No saved presets yet. Use <strong>New</strong> or <strong>Save…</strong> on the Tone tab, or import a JSON file.</p>
@@ -181,6 +195,53 @@
     <p id="bt-scanning">Scanning… make sure the amp is on and the official app is closed.</p>
     <ul id="bt-list" class="bt-list"></ul>
     <button type="button" id="bt-cancel">Cancel</button>
+  </dialog>
+
+  <dialog id="organize-dialog" aria-labelledby="organize-title">
+    <form method="dialog" class="dialog-form">
+      <h2 id="organize-title">Organize saved preset</h2>
+      <p class="hint">Artist, song, tags, favorite and guitar profile are local library information. They do not change the amp's tone.</p>
+      <label for="organize-artist">Artist</label>
+      <input id="organize-artist" maxlength="80" autocomplete="off" placeholder="Children of Bodom">
+      <label for="organize-song">Song</label>
+      <input id="organize-song" maxlength="80" autocomplete="off" placeholder="Sixpounder">
+      <label for="organize-tags">Tags (comma-separated)</label>
+      <input id="organize-tags" maxlength="400" autocomplete="off" placeholder="Rhythm, Lead, Drop C">
+      <label for="organize-guitar">Guitar profile</label>
+      <select id="organize-guitar"><option value="">Not assigned</option></select>
+      <label class="row"><input type="checkbox" id="organize-favorite"> Add to favorites ★</label>
+      <div class="row dialog-buttons">
+        <button value="cancel" formnovalidate>Cancel</button>
+        <button value="ok" class="primary">Save details</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="guitars-dialog" aria-labelledby="guitars-title">
+    <div class="dialog-form">
+      <h2 id="guitars-title">Guitar profiles</h2>
+      <p class="hint">Store instrument, tuning and pickup information locally. Profiles are notes, not automatic changes to the Spark amp.</p>
+      <ul id="guitars-list" class="guitar-profile-list"></ul>
+      <form id="guitar-form" class="dialog-form">
+        <input type="hidden" id="guitar-id">
+        <label for="guitar-name">Guitar / profile name</label>
+        <input id="guitar-name" required maxlength="100" autocomplete="off" placeholder="My electric guitar">
+        <label for="guitar-tuning">Tuning</label>
+        <input id="guitar-tuning" maxlength="50" autocomplete="off" placeholder="Drop C">
+        <label for="guitar-pickups">Pickups</label>
+        <input id="guitar-pickups" maxlength="120" autocomplete="off" placeholder="Bridge humbucker">
+        <label for="guitar-voice">Voice / position</label>
+        <input id="guitar-voice" maxlength="80" autocomplete="off" placeholder="Bridge, Voice 1">
+        <label for="guitar-notes">Notes</label>
+        <textarea id="guitar-notes" rows="2" maxlength="400"></textarea>
+        <div class="row dialog-buttons">
+          <button type="button" id="guitar-new">New profile</button>
+          <button type="button" id="guitar-delete" disabled>Delete</button>
+          <button type="submit" class="primary">Save profile</button>
+        </div>
+      </form>
+      <button type="button" id="guitars-close">Close</button>
+    </div>
   </dialog>
 
   <dialog id="new-dialog" aria-labelledby="new-title">

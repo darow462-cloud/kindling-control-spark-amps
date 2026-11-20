@@ -618,6 +618,55 @@ dialog#bt-picker h2 { margin: 0 0 0.5rem; font-size: 1.1rem; }
 .library .lib-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.25rem; }
 .library .lib-actions button { min-height: 2.25rem; padding-inline: 0.7rem; }
 
+/* ---- preset organization and guitar profiles (local-only) ---------------- */
+.library-organizer {
+  display: flex; gap: 0.6rem; align-items: end; flex-wrap: wrap;
+  margin-bottom: 0.6rem; padding: 0.7rem;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 0.8rem;
+}
+.library-organizer > label:not(.favorite-filter) {
+  display: grid; gap: 0.2rem; flex: 1 1 10rem; min-width: min(10rem, 100%);
+  color: var(--muted); font-size: 0.78rem; font-weight: 600;
+}
+.library-organizer > label:first-child { flex-grow: 2; }
+.library-organizer input[type="search"], .library-organizer select {
+  min-height: 2.5rem; inline-size: 100%; padding: 0.35rem 0.55rem;
+  color: var(--text); background: var(--bg-2); font: inherit;
+  border: 1px solid var(--border); border-radius: 0.5rem;
+}
+.library-organizer .favorite-filter {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.45rem 0.25rem; white-space: nowrap; font-size: 0.86rem;
+}
+.library-results { font-size: 0.82rem; color: var(--muted); margin: 0 0 0.6rem; }
+.library .lib-header { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; }
+.library .lib-header .lib-name { min-width: 0; overflow-wrap: anywhere; }
+.library .lib-star {
+  flex: none; padding: 0; inline-size: 2rem; min-height: 2rem;
+  border-radius: 0.4rem; font-size: 1.35rem; line-height: 1;
+}
+.library .lib-star[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
+#organize-dialog .dialog-form, #guitars-dialog .dialog-form { gap: 0.35rem; }
+#organize-dialog input:not([type="checkbox"]), #organize-dialog select,
+#guitars-dialog input:not([type="hidden"]), #guitars-dialog textarea {
+  font: inherit; width: 100%; padding: 0.35rem 0.55rem;
+  min-height: 2.3rem; background: var(--bg-2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 0.45rem;
+}
+#guitars-dialog textarea { resize: vertical; }
+.guitar-profile-list {
+  padding: 0; margin: 0.35rem 0 0.7rem; list-style: none;
+  max-height: 10rem; overflow-y: auto; display: grid; gap: 0.35rem;
+}
+.guitar-profile-list li {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 0.5rem; padding: 0.35rem; border: 1px solid var(--border);
+  border-radius: 0.5rem; background: var(--bg-2);
+}
+.guitar-profile-list .guitar-profile-info { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 0.83rem; }
+.guitar-profile-list button { flex: none; min-height: 2rem; }
+
+
 @media (prefers-reduced-motion: reduce) {
   input.switch, input.switch::before, .footswitch, .tuner .needle, .pedal { transition: none; }
   .pill[data-state="busy"] .status-icon { animation: none; }
