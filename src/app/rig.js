@@ -42,8 +42,10 @@ export function createRig({ root, state, actions }) {
     const value = fx.params[p] ?? 0;
     let ctl;
     const onInput = (v) => {
+      if (actions.isBusy?.() || fx.params[p] === v) return;
       fx.params[p] = v;
       sync(i, p, v, ctl.set);
+      actions.onEdit?.(`param:${i}:${p}`);
       sendParam(fx, p, v);
     };
     if (info.kind === 'switch') ctl = createToggle({ label: info.name, value, onInput });
@@ -115,10 +117,12 @@ export function createRig({ root, state, actions }) {
     };
     set(fx.isOn);
     b.addEventListener('click', () => {
+      if (actions.isBusy?.()) return;
       fx.isOn = !fx.isOn;
       set(fx.isOn);
       markBlock(i, fx.isOn);
       board.querySelector('.amp-link')?.classList.toggle('off', !fx.isOn);
+      actions.onEdit?.(`toggle:${i}`);
       actions.setOnOff(fx.name, fx.isOn);
     });
     switches.set(i, set);
@@ -159,9 +163,11 @@ export function createRig({ root, state, actions }) {
       label: `${known?.name ?? fx.name} on`,
       on: fx.isOn,
       onToggle: (on) => {
+        if (actions.isBusy?.()) return;
         fx.isOn = on;
         el.classList.toggle('off', !on);
         markBlock(i, on);
+        actions.onEdit?.(`toggle:${i}`);
         actions.setOnOff(fx.name, on);
       },
     });
@@ -330,6 +336,10 @@ export function createRig({ root, state, actions }) {
   // ---- public ------------------------------------------------------------------------
 
   function render() {
+    // A re-render replaces the controls; never let old trailing knob writes
+    // arrive later and change a newly restored A/B or Undo snapshot.
+    for (const sender of senders.values()) sender.cancel();
+    senders.clear();
     controls.clear();
     switches.clear();
     reorder = null;
@@ -398,6 +408,9 @@ export function createRig({ root, state, actions }) {
 
   return {
     render,
+    flushPendingParams: () => {
+      for (const sender of senders.values()) sender.flush();
+    },
     updateParam: (i, p, v) => sync(i, p, v),
     setOnOff(i, on) {
       switches.get(i)?.(on);
@@ -414,18 +427,39 @@ function throttle(fn, ms) {
   let last = 0;
   let timer = null;
   let pending;
-  return (v) => {
-    pending = v;
+  const run = (v) => {
+    last = performance.now();
+    fn(v);
+  };
+  const call = (v) => {
     const now = performance.now();
     if (now - last >= ms) {
-      last = now;
-      fn(v);
-    } else if (!timer) {
-      timer = setTimeout(() => {
+      pending = undefined;
+      run(v);
+    } else {
+      pending = v;
+      if (!timer) timer = setTimeout(() => {
         timer = null;
-        last = performance.now();
-        fn(pending);
+        if (pending === undefined) return;
+        const next = pending;
+        pending = undefined;
+        run(next);
       }, ms - (now - last));
     }
   };
+  call.flush = () => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+    if (pending !== undefined) {
+      const next = pending;
+      pending = undefined;
+      run(next);
+    }
+  };
+  call.cancel = () => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+    pending = undefined;
+  };
+  return call;
 }

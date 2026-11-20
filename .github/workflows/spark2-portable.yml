@@ -1,12 +1,13 @@
-name: Spark 2 Windows Portable (test build)
+name: KindlingControl 0.3 Windows Portable (test build)
 
 on:
   push:
     branches:
-      - fix/spark2-model-swap-fallback
+      - feature/v0.3-editor-ab-history
     paths:
       - ".github/workflows/spark2-portable.yml"
       - "src/**"
+      - "test/**"
       - "desktop/**"
       - "package.json"
       - "package-lock.json"
@@ -27,16 +28,20 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Run tests
+        run: npm test
+      - name: Stamp development build version
+        run: node tools/stamp-version.js 0.3.0-editor.1
       - name: Build portable Windows exe
         shell: pwsh
         run: >
           npx electron-builder --win portable --x64 --publish never
-          --config.extraMetadata.version=0.2.1-spark2fix.1
-          --config.productName="KindlingControl Spark2 Test"
-          --config.appId=dev.bluedog.kindlingcontrol.spark2test
+          --config.extraMetadata.version=0.3.0-editor.1
+          --config.productName="KindlingControl Editor 0.3 Test"
+          --config.appId=dev.bluedog.kindlingcontrol.editor03
       - uses: actions/upload-artifact@v4
         with:
-          name: KindlingControl-Spark2-Portable-Win-x64
+          name: KindlingControl-Editor03-Portable-Win-x64
           path: dist/*.exe
           if-no-files-found: error
           retention-days: 14

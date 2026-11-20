@@ -19,6 +19,7 @@ import {
 } from '../spark/index.js';
 import { PresetLibrary } from './library.js';
 import { createRig } from './rig.js';
+import { ToneSession } from './tone-session.js';
 import { createReporter, detectApp, scrubLog } from './telemetry.js';
 import { VERSION } from '../version.js';
 
@@ -66,6 +67,81 @@ const state = {
   mock: null,
 };
 
+// A and B each have independent, in-memory edit history. Nothing stored on the
+// amp changes until the user explicitly chooses a hardware slot in Save….
+const toneSession = new ToneSession();
+let toneBusy = false;
+
+function updateToneTools() {
+  const ready = !!state.preset && toneSession.available;
+  const bar = $('#tone-tools');
+  bar.hidden = !ready;
+  $('#tone-undo').disabled = !ready || toneBusy || !toneSession.canUndo;
+  $('#tone-redo').disabled = !ready || toneBusy || !toneSession.canRedo;
+  for (const side of ['A', 'B']) {
+    const b = $('#tone-' + side.toLowerCase());
+    b.disabled = !ready || toneBusy;
+    b.setAttribute('aria-pressed', String(toneSession.active === side));
+  }
+  $('#tone-copy').disabled = !ready || toneBusy;
+  $('#tone-copy').textContent = `Copy ${toneSession.active} → ${toneSession.active === 'A' ? 'B' : 'A'}`;
+  $('#new-preset').disabled = toneBusy;
+  $('#save-preset').disabled = !state.preset || toneBusy;
+  $('#refresh').disabled = !state.connected || toneBusy;
+  $('#rig').inert = toneBusy;
+}
+
+function resetToneSession() {
+  toneSession.reset(state.preset);
+  updateToneTools();
+}
+
+function recordToneEdit(key) {
+  if (!state.preset) return;
+  toneSession.record(state.preset, key);
+  state.unsaved = true;
+  renderPresetHeader();
+  updateToneTools();
+}
+
+/** Prevent trailing throttled parameter writes from altering the next live tone. */
+async function flushToneWrites() {
+  rig.flushPendingParams();
+  if (state.connected) await state.client.queue;
+}
+
+/**
+ * Restore an entire tone non-destructively: connected amps play the temporary
+ * slot 0x7F; no hardware preset is overwritten. Return the actual readback.
+ */
+async function restoreTone(target) {
+  if (toneBusy || !target || !state.preset) return null;
+  toneBusy = true;
+  updateToneTools();
+  try {
+    await flushToneWrites();
+    if (state.connected) {
+      await state.client.loadPreset(target, TEMP_SLOT);
+      state.preset = await state.client.getPreset('current');
+      state.slot = TEMP_SLOT;
+      highlightSlot();
+    } else {
+      state.preset = structuredClone(target);
+    }
+    state.unsaved = true;
+    renderPreset();
+    return structuredClone(state.preset);
+  } catch (err) {
+    logLine('err', `could not restore tone: ${err.message}`);
+    reportError('restore-tone', err);
+    toast(`Couldn't restore tone: ${err.message}. Press Refresh to resync if necessary.`, 'warn');
+    return null;
+  } finally {
+    toneBusy = false;
+    updateToneTools();
+  }
+}
+
 // ---------------------------------------------------------------------------
 // connection
 // ---------------------------------------------------------------------------
@@ -110,6 +186,7 @@ $('#connect').addEventListener('click', async () => {
     state.slot = info.presetNumber;
     highlightSlot();
     await refreshPreset();
+    resetToneSession();
   } catch (err) {
     console.error(err);
     reportError('connect', err);
@@ -149,6 +226,7 @@ function wireClient(c) {
     state.preset.pedals[i].params[index] = value;
     rig.updateParam(i, index, value);
     rig.flash(i);
+    if (!toneBusy) toneSession.capture(state.preset);
   });
   c.addEventListener('effectOnOff', (e) => {
     const { effect, on } = e.detail;
@@ -157,14 +235,18 @@ function wireClient(c) {
     state.preset.pedals[i].isOn = on;
     rig.setOnOff(i, on);
     rig.flash(i);
+    if (!toneBusy) toneSession.capture(state.preset);
   });
-  c.addEventListener('effectChanged', () => refreshPreset());
+  c.addEventListener('effectChanged', () => {
+    if (!toneBusy) refreshPreset();
+  });
   c.addEventListener('presetSelected', (e) => {
-    if (e.detail.solicited) return;
+    // Internal A/B and Undo operations select the temporary slot.
+    if (e.detail.solicited || e.detail.slot === TEMP_SLOT) return;
     state.slot = e.detail.slot;
     state.unsaved = false; // the amp moved on; the unsaved tone is gone
     highlightSlot();
-    refreshPreset();
+    refreshPreset().then(resetToneSession);
   });
   c.addEventListener('presetStored', (e) => logLine('rx', `amp stored current state to preset ${e.detail.slot + 1}`));
   c.addEventListener('tuner', (e) => showTuner(e.detail));
@@ -224,6 +306,7 @@ function refreshPreset() {
       if (!state.client) break;
       try {
         state.preset = await state.client.getPreset('current');
+        if (toneSession.available && !toneBusy) toneSession.capture(state.preset);
         renderPreset();
       } catch (err) {
         logLine('err', `could not read current preset: ${err.message}`);
@@ -234,7 +317,11 @@ function refreshPreset() {
   return refreshing;
 }
 
-$('#refresh').addEventListener('click', refreshPreset);
+$('#refresh').addEventListener('click', async () => {
+  if (toneBusy) return;
+  await flushToneWrites();
+  await refreshPreset();
+});
 
 for (const b of $$('.banks button')) {
   // Switching bank selects the preset in the same position in the new bank
@@ -259,13 +346,16 @@ for (const b of $$('.preset-buttons button')) {
 }
 
 async function selectSlot(slot) {
+  if (toneBusy) return;
   if (state.unsaved && !confirm('Your new preset is not saved yet. Switch presets anyway?')) return;
   try {
+    await flushToneWrites();
     await state.client.selectPreset(slot);
     state.slot = slot;
     state.unsaved = false;
     highlightSlot();
     await refreshPreset();
+    resetToneSession();
   } catch (err) {
     logLine('err', err.message);
     reportError('select-preset', err);
@@ -308,6 +398,8 @@ async function liveTone() {
 }
 
 async function makeLive(preset) {
+  if (toneBusy) return;
+  await flushToneWrites();
   if (state.connected) {
     await state.client.loadPreset(preset, TEMP_SLOT);
     state.slot = TEMP_SLOT;
@@ -317,6 +409,7 @@ async function makeLive(preset) {
     state.preset = structuredClone(preset);
     renderPreset();
   }
+  resetToneSession();
 }
 
 // ---- New ------------------------------------------------------------------
@@ -334,6 +427,7 @@ $('#new-dialog').addEventListener('close', async () => {
   const name = $('#new-name').value.trim() || 'New preset';
   const from = $('input[name="new-from"]:checked').value;
   try {
+    await flushToneWrites();
     const base = from === 'current' && state.preset ? await liveTone() : blankPreset(name);
     const preset = { ...base, name, uuid: randomUuid(), description: from === 'current' ? base.description : '' };
     await makeLive(preset);
@@ -384,6 +478,7 @@ $('#save-dialog').addEventListener('close', async () => {
   const slotValue = $('#save-slot').value;
   if (!toLibrary && slotValue === '') return;
   try {
+    await flushToneWrites();
     const tone = await liveTone();
     const preset = {
       ...tone,
@@ -405,6 +500,7 @@ $('#save-dialog').addEventListener('close', async () => {
       state.preset = preset;
       renderPreset();
     }
+    resetToneSession();
   } catch (err) {
     logLine('err', `save failed: ${err.message}`);
     reportError('save-preset', err);
@@ -480,7 +576,8 @@ $('#import').addEventListener('change', async (e) => {
 });
 
 $('#export-current').addEventListener('click', async () => {
-  if (!state.preset) return;
+  if (!state.preset || toneBusy) return;
+  await flushToneWrites();
   download(state.preset.name, presetToJson(await liveTone()));
 });
 
@@ -492,26 +589,32 @@ const rig = createRig({
   root: $('#rig'),
   state,
   actions: {
+    isBusy: () => toneBusy,
+    onEdit: recordToneEdit,
     setParam: (effect, p, v) => state.client?.setParam(effect, p, v).catch((e) => (logLine('err', e.message), reportError('set-param', e))),
     setOnOff: (effect, on) => state.client?.setEffectOnOff(effect, on).catch((e) => (logLine('err', e.message), reportError('set-on-off', e))),
     async changeEffect(from, to) {
+      if (toneBusy) return false;
       if (!state.connected) {
         const fx = state.preset.pedals.find((f) => f.name === from);
         if (fx) Object.assign(fx, { name: to, params: defaultParams(to, fx.params.length) });
-        state.unsaved = true;
+        recordToneEdit('model');
         renderPreset();
         return true;
       }
+      toneBusy = true;
+      updateToneTools();
       try {
+        await flushToneWrites();
         const { method, preset } = await state.client.swapEffect(from, to);
         state.preset = preset;
         if (method === 'preset') {
           state.slot = TEMP_SLOT;
-          state.unsaved = true;
           highlightSlot();
           logLine('info', `swap ${from} → ${to}: amp did not apply 01 06; loaded the edited preset into the temporary slot`);
           toast('The amp did not apply the quick model change. The edited tone is now in the temporary slot; nothing stored changed. Use Save… to keep it.');
         }
+        recordToneEdit('model');
         renderPreset();
         return true;
       } catch (err) {
@@ -519,24 +622,31 @@ const rig = createRig({
         reportError('change-effect', err);
         toast(`Couldn't change the model: ${err.message}`, 'warn', { label: 'Troubleshooting', run: () => openHelp('troubleshooting') });
         return false;
+      } finally {
+        toneBusy = false;
+        updateToneTools();
       }
     },
     async applyOrder(pedals) {
+      if (toneBusy) return;
       if (!state.connected) {
         state.preset = { ...state.preset, pedals };
-        state.unsaved = true;
+        recordToneEdit('chain');
         renderPreset();
         toast('Chain order changed. Connect to an amp to try it.');
         return;
       }
+      toneBusy = true;
+      updateToneTools();
       try {
+        await flushToneWrites();
         toast('Trying the new order on the amp (temporary slot, nothing stored changes)…');
         const tone = await liveTone();
         const { accepted, preset } = await state.client.tryChainOrder({ ...tone, pedals: pedals.map((fx) => tone.pedals.find((t) => t.name === fx.name) ?? fx) });
         state.slot = TEMP_SLOT;
-        state.unsaved = true;
         highlightSlot();
         state.preset = preset;
+        recordToneEdit('chain');
         renderPreset();
         logLine('info', `chain reorder ${accepted ? 'kept' : 'normalised'} by amp: ${preset.pedals.map((f) => f.name).join(' → ')}`);
         toast(
@@ -549,9 +659,63 @@ const rig = createRig({
         logLine('err', `reorder failed: ${err.message}`);
         reportError('reorder', err);
         toast(`Reorder failed: ${err.message}`, 'warn');
+      } finally {
+        toneBusy = false;
+        updateToneTools();
       }
     },
   },
+});
+
+// History operations only become final once the amp has loaded and returned the
+// restored tone. A failed Bluetooth transfer leaves the Undo/Redo stacks intact.
+async function replayTone(direction) {
+  if (toneBusy || !state.preset) return;
+  const target = direction === 'undo' ? toneSession.peekUndo() : toneSession.peekRedo();
+  if (!target) return;
+  const applied = await restoreTone(target);
+  if (!applied) return;
+  if (direction === 'undo') toneSession.commitUndo(applied);
+  else toneSession.commitRedo(applied);
+  updateToneTools();
+}
+
+async function switchToneVariant(which) {
+  if (toneBusy || !state.preset || toneSession.active === which) return;
+  const previous = structuredClone(state.preset);
+  const target = toneSession.snapshot(which);
+  const applied = await restoreTone(target);
+  if (!applied) return;
+  toneSession.activate(which, previous, applied);
+  updateToneTools();
+}
+
+$('#tone-undo').addEventListener('click', () => replayTone('undo'));
+$('#tone-redo').addEventListener('click', () => replayTone('redo'));
+$('#tone-a').addEventListener('click', () => switchToneVariant('A'));
+$('#tone-b').addEventListener('click', () => switchToneVariant('B'));
+$('#tone-copy').addEventListener('click', () => {
+  if (toneBusy || !state.preset) return;
+  const other = toneSession.copyToOther(state.preset);
+  updateToneTools();
+  toast(`Copied tone ${toneSession.active} into ${other}; now select ${other} to compare.`);
+});
+
+// Keep native text-input Undo behaviour. Shortcuts apply only when focus is
+// outside editable controls and do not affect the hardware's saved presets.
+document.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.target.closest?.('textarea, select, [contenteditable="true"], input:not([type="range"]):not([type="checkbox"])')) return;
+  const k = e.key.toLowerCase();
+  if (toneBusy || !state.preset) return;
+  const redo = k === 'y' || (k === 'z' && e.shiftKey);
+  const undo = k === 'z' && !e.shiftKey;
+  if (redo && toneSession.canRedo) {
+    e.preventDefault();
+    replayTone('redo');
+  } else if (undo && toneSession.canUndo) {
+    e.preventDefault();
+    replayTone('undo');
+  }
 });
 
 function renderPreset() {
@@ -561,6 +725,7 @@ function renderPreset() {
   $('#export-current').disabled = !p;
   rig.render();
   renderLibrary();
+  updateToneTools();
 }
 
 function renderPresetHeader() {

@@ -13,6 +13,14 @@ let uid = 0;
 // let long labels like "Limit/Compress" wrap at the slash rather than mid-word
 const wrapAtSlash = (text) => String(text).replace(/\//g, '/\u200b');
 
+/** Convert a typed 0–10 display value into the protocol's 0..1 range. */
+export function parseKnobValue(text) {
+  const raw = String(text).trim().replace(',', '.');
+  const n = raw ? Number(raw) : NaN;
+  if (!Number.isFinite(n)) return null;
+  return Math.round(Math.min(1, Math.max(0, n / 10)) * 1000) / 1000;
+}
+
 function svg(tag, attrs = {}) {
   const el = document.createElementNS(SVG_NS, tag);
   for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
@@ -76,17 +84,22 @@ export function createKnob({ label, value = 0, variant = 'pedal', onInput }) {
   }
   s.append(body);
 
-  const input = Object.assign(document.createElement('input'), { type: 'range', id, min: '0', max: '1', step: '0.01', className: 'knob-input' });
-  const out = Object.assign(document.createElement('output'), { htmlFor: id, className: 'knob-value' });
+  const input = Object.assign(document.createElement('input'), { type: 'range', id, min: '0', max: '1', step: '0.001', className: 'knob-input' });
+  const numeric = Object.assign(document.createElement('input'), {
+    type: 'text', inputMode: 'decimal', className: 'knob-value-input',
+    autocomplete: 'off', spellcheck: false,
+  });
+  numeric.setAttribute('aria-label', `${label}: precise value from 0 to 10`);
+  numeric.title = 'Exact value (0–10). Comma or dot accepted.';
   dial.append(s, input);
-  wrap.append(lab, dial, out);
+  wrap.append(lab, dial, numeric);
 
   const fill = s.querySelector('.knob-fill');
   const render = (v) => {
     body.setAttribute('transform', `rotate(${START + SWEEP * v} 50 50)`);
     fill.setAttribute('stroke-dasharray', `${(v * 100).toFixed(2)} 100`);
-    const text = (v * 10).toFixed(1);
-    out.textContent = text;
+    const text = String(Number((v * 10).toFixed(2)));
+    if (document.activeElement !== numeric) numeric.value = text;
     input.setAttribute('aria-valuetext', `${text} of 10`);
   };
   const set = (v) => {
@@ -99,6 +112,51 @@ export function createKnob({ label, value = 0, variant = 'pedal', onInput }) {
   input.addEventListener('input', () => {
     render(Number(input.value));
     onInput(Number(input.value));
+  });
+
+  // Enter an exact 0–10 value; the Spark protocol still receives 0..1.
+  const commitNumber = () => {
+    const v = parseKnobValue(numeric.value);
+    if (v == null) {
+      numeric.value = String(Number((Number(input.value) * 10).toFixed(2)));
+      return;
+    }
+    const old = Number(input.value);
+    set(v);
+    numeric.value = String(Number((v * 10).toFixed(2)));
+    if (v !== old) onInput(v);
+  };
+  numeric.addEventListener('change', commitNumber);
+  numeric.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') numeric.blur();
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      numeric.value = String(Number((Number(input.value) * 10).toFixed(2)));
+      numeric.blur();
+    }
+  });
+
+  dial.addEventListener('wheel', (e) => {
+    if (!e.deltaY) return;
+    e.preventDefault();
+    const step = e.shiftKey ? 0.001 : 0.01;
+    const old = Number(input.value);
+    const v = Math.round(Math.min(1, Math.max(0, old + (e.deltaY < 0 ? step : -step))) * 1000) / 1000;
+    if (v !== old) {
+      set(v);
+      onInput(v);
+    }
+  }, { passive: false });
+  input.addEventListener('keydown', (e) => {
+    if (!e.shiftKey || !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+    e.preventDefault();
+    const old = Number(input.value);
+    const dir = e.key === 'ArrowUp' || e.key === 'ArrowRight' ? 1 : -1;
+    const v = Math.round(Math.min(1, Math.max(0, old + dir * 0.001)) * 1000) / 1000;
+    if (v !== old) {
+      set(v);
+      onInput(v);
+    }
   });
 
   // Pointer: drag up/right to turn clockwise. Fine control with Shift.

@@ -114,6 +114,13 @@
           </ul>
         </section>
 
+        <section id="tone-history">
+          <h3>Undo, Redo and A/B comparison</h3>
+          <p>The editing bar appears once a tone is loaded. <strong>Undo</strong> reverses your latest edits; <strong>Redo</strong> reapplies them. Quick movements of the same knob count as one step. Keyboard shortcuts are <kbd>Ctrl+Z</kbd> and <kbd>Ctrl+Y</kbd> (or <kbd>Ctrl+Shift+Z</kbd>); they do not override Undo while typing into a field.</p>
+          <p><strong>A</strong> and <strong>B</strong> start as two copies of the loaded tone. Edit A, then switch to B and edit it separately; the two variants keep independent histories. <strong>Copy A → B</strong> (or <strong>Copy B → A</strong>) replaces the other variant with your current sound. Loading a new preset starts a fresh comparison.</p>
+          <p><strong>Safety:</strong> with an amp connected, switching A/B or using Undo/Redo uploads a full tone to the amp's temporary slot. It does not overwrite any of your saved hardware presets. Use <strong>Save…</strong> explicitly if you want to keep the sound. The A/B history is in memory only and does not persist after closing the app.</p>
+        </section>
+
         <section id="signal-chain">
           <h3>The signal chain</h3>
           <p>
@@ -154,6 +161,7 @@
           <ul>
             <li><strong>Drag up or right</strong> to turn a knob up, <strong>down or left</strong> to turn it down. Hold <kbd>Shift</kbd> while dragging for fine adjustments.</li>
             <li><strong>Double-click</strong> (or double-tap) a knob to reset it to the middle (5).</li>
+            <li><strong>Exact values:</strong> type a number from 0 to 10 in the field under a knob. A dot or comma is accepted for decimals. Use the mouse wheel over a knob to adjust by 0.1; hold Shift for 0.01 steps. Values outside 0–10 are clamped.</li>
             <li>With the keyboard, <kbd>Tab</kbd> to a knob and use the arrow keys. <kbd>Page Up</kbd> and <kbd>Page Down</kbd> make bigger steps.</li>
             <li>Values run from 0 to 10, as in the official app. Changes are sent to the amp as you turn.</li>
           </ul>
