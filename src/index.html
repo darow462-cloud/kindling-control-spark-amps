@@ -76,6 +76,19 @@
         </div>
       </div>
 
+      <div id="tone-tools" class="tone-tools" role="group" aria-label="Edit history and A/B comparison" hidden>
+        <div class="tone-history-actions">
+          <button type="button" id="tone-undo" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
+          <button type="button" id="tone-redo" title="Redo (Ctrl+Y or Ctrl+Shift+Z)" disabled>↷ Redo</button>
+        </div>
+        <div class="tone-compare-actions" role="group" aria-label="Compare tone variants">
+          <span class="tone-tools-caption">Compare</span>
+          <button type="button" id="tone-a" aria-pressed="true" disabled>A</button>
+          <button type="button" id="tone-b" aria-pressed="false" disabled>B</button>
+          <button type="button" id="tone-copy" title="Replace the other variant with the current sound" disabled>Copy A → B</button>
+        </div>
+      </div>
+
       <div id="rig" class="rig" hidden>
         <section class="chain-strip" aria-label="Signal chain">
           <div class="chain-track"></div>
