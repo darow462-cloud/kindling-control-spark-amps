@@ -107,6 +107,47 @@ test('tryChainOrder: fixed-chain amp normalises the order, flexible amp keeps it
   }
 });
 
+test('swapEffect keeps the 01 06 path when the amp applies an amp-model change', async () => {
+  const { t, c } = await connected();
+  t.current.pedals[3].name = 'ODS50CN';
+  t.current.pedals[3].params = [0.8, 0.4, 0.6, 0.3, 0.7];
+  const sent = [];
+  c.addEventListener('sent', (e) => sent.push({ cmd: e.detail.cmd, sub: e.detail.sub }));
+
+  const { method, preset } = await c.swapEffect('ODS50CN', 'Deluxe65');
+
+  assert.equal(method, 'swap');
+  assert.equal(preset.pedals[3].name, 'Deluxe65');
+  assert.equal(t.slot, 0);
+  assert.ok(!sent.some((m) => m.cmd === 1 && m.sub === 1), 'no preset upload on a successful swap');
+});
+
+for (const [swap, how] of [['ignore', 'acks 01 06 but keeps the old model'], ['silent', 'never acks 01 06']]) {
+  test(`swapEffect falls back to the temporary slot when the amp ${how}`, async () => {
+    const { t, c } = await connected({ swap });
+    t.current.pedals[3].name = 'ODS50CN';
+    t.current.pedals[3].params = [0.8, 0.4, 0.6, 0.3, 0.7];
+    const stored = structuredClone(t.presets[0]);
+    const sent = [];
+    c.addEventListener('sent', (e) => sent.push({ cmd: e.detail.cmd, sub: e.detail.sub }));
+
+    const { method, preset } = await c.swapEffect('ODS50CN', 'Deluxe65');
+
+    assert.equal(method, 'preset');
+    assert.equal(preset.pedals[3].name, 'Deluxe65');
+    assert.deepEqual(preset.pedals[3].params, [0.5, 0.5, 0.5, 0.5, 0.5]);
+    assert.equal(preset.pedals[3].isOn, true);
+    assert.equal(t.slot, 0x7f);
+    assert.deepEqual(t.presets[0], stored, 'fallback must not overwrite the stored hardware preset');
+    assert.ok(sent.some((m) => m.cmd === 1 && m.sub === 1), 'fallback uploads the edited preset');
+  });
+}
+
+test('swapEffect rejects when the old model is not in the live preset', async () => {
+  const { c } = await connected({ swap: 'ignore' });
+  await assert.rejects(c.swapEffect('NoSuchModel', 'Deluxe65'), /isn't in the amp's current preset/);
+});
+
 // Issue #9: "timeout waiting for 3:1" when preset reads overlap (e.g. the amp's preset
 // button pressed twice quickly, each press triggering a refresh).
 test('overlapping preset reads are sent one at a time, so none times out (#9)', async () => {

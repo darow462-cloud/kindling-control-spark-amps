@@ -167,6 +167,17 @@ export function paramInfo(effectId, index, slotKey) {
   return { name: `Param ${index + 1}`, kind: 'knob' };
 }
 
+/**
+ * Starting values for a newly selected model: neutral knobs and off/first
+ * positions for switches and selectors. Unknown models keep the old parameter
+ * count so the preset remains editable.
+ */
+export function defaultParams(effectId, fallbackCount = 0) {
+  const known = findEffect(effectId)?.params ?? [];
+  const count = known.length || fallbackCount;
+  return Array.from({ length: count }, (_, i) => (known[i] && known[i].kind !== 'knob' ? 0 : 0.5));
+}
+
 /** A neutral starting point for a new preset: clean amp, gate + reverb on, the rest off. */
 export function blankPreset(name = 'New preset') {
   const p = (id, isOn, params) => ({ name: id, isOn, params });

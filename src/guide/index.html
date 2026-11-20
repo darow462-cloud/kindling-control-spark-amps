@@ -126,6 +126,7 @@
           <h3>The amp</h3>
           <ul>
             <li>Choose the <strong>amp model</strong> from the menu on the left of the amp head. Under the name you'll see which real amp it's based on, where that's known.</li>
+            <li>After a model change, the app checks what the amp is actually playing. If the amp acknowledges the quick change but keeps the old model, the app tries loading the edited tone into the temporary slot. Nothing in the stored hardware banks is overwritten; use <strong>Save…</strong> if you want to keep the result.</li>
             <li>The knobs are laid out like the amp's top panel: <strong>Gain, Bass, Middle, Treble, Volume</strong>.</li>
             <li><strong>ON/OFF</strong> bypasses the amp model; the red jewel light shows when it's on.</li>
             <li>Turning a knob on the amp itself moves the matching knob on screen.</li>
@@ -309,6 +310,9 @@
 
           <dt>"GATT operation failed for unknown reason"</dt>
           <dd>Usually seen on macOS. The app already retries with a different write mode by itself. If it still fails, power-cycle the amp and reconnect. If you report it, include the Console lines.</dd>
+
+          <dt>The amp model didn't change</dt>
+          <dd>The app checks the live preset after a model change. If the amp did not apply the quick change, it tries uploading the edited tone to the temporary slot. If that also fails, check the red error lines in the <strong>Console</strong> and include your amp model and firmware version when reporting it.</dd>
 
           <dt>The screen doesn't match the amp</dt>
           <dd>Press <strong>Refresh</strong> to read the current tone from the amp again.</dd>

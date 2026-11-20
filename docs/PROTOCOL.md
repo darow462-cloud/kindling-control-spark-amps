@@ -75,7 +75,7 @@ Parameter values are floats from 0.0 to 1.0. The app shows them as 0 to 10.
 |---|---|---|---|
 | `01 01` | preset (see below), multi-chunk | `05 01` per chunk, `04 01` at the end | upload preset to slot 0–3 or `7F` (temporary) |
 | `01 04` | pstr effect, int param, float value, input (`00` = Input 1, `01` = Input 2) | **none** | set a parameter. The **Spark 2** (firmware 2.7.2.200) silently ignores it without the trailing input byte. We always send `00`; that this is harmless on the Spark 40 / GO / MINI / NEO is **(unverified)** |
-| `01 06` | pstr old, pstr new | `04 06` | swap the model in a slot (e.g. `Twin` → `Plexi`) |
+| `01 06` | pstr old, pstr new | `04 06` | swap the model in a slot (e.g. `Twin` → `Plexi`). A Spark 2 on firmware 2.4.2.141 has been observed to ACK this command while retaining the old model. The app reads the live preset back and, if the old model remains, tries uploading the edited preset to temporary slot `7F` with `01 01`. This fallback still needs confirmation on real Spark 2 hardware |
 | `01 15` | pstr effect, bool, `00` | `04 15` | effect on/off |
 | `01 28` | pstr effect, bool | `04 28` | ask the amp to report expression/wah volume (JH.Vox846) |
 | `01 38` | `00`, slot | `04 38` | select a hardware preset (0–3; **Spark 2: 0–7**, where 4–7 is bank 2), or `7F` |
