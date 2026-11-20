@@ -201,6 +201,7 @@ test('High Quality combines fine-tuned drums/bass/vocals and six-stem guitar/pia
     spawnProcess: fakeProcess(({ args, child }) => {
       launched.push(args);
       (async () => {
+        await mkdir(args[4], { recursive: true });
         const model = args[2];
         for (const name of model === 'htdemucs_ft'
           ? ['drums', 'bass', 'other', 'vocals'] : STEM_NAMES) {
@@ -251,6 +252,7 @@ test('cancellation during the FT stage aborts without exporting half-finished HQ
         return;
       }
       (async () => {
+        await mkdir(args[4], { recursive: true });
         for (const name of STEM_NAMES) {
           await writeFile(join(args[4], name + '.wav'), Buffer.alloc(100, 1));
         }
