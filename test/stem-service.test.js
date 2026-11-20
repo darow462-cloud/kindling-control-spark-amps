@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import {
   STEM_NAMES, STEM_LABELS, sanitizedStemBase, buildStemCommand,
   validStemName, cleanStemProgress, StemSeparationService,
+  validateStemMode, stemStages, STEM_MODES,
 } from '../desktop/stem-service.js';
 
 function fakeProcess(onLaunch) {
@@ -71,6 +72,9 @@ test('successful native run returns 6 output WAV paths, engine arguments and loc
     })().catch((e) => child.emit('error', e));
   });
   const separator = new StemSeparationService({
+    // Legacy subprocess tests use tiny placeholder WAVs; real float WAV
+    // validation and level protection have their own regression suite.
+    peakGuard: async () => ({ gainDb: 0, peakBeforeDb: -3, peakAfterDb: -3, samplesOverFullScale: 0, enabled: true }),
     executable: 'demucs-test.exe', spawnProcess: fake,
     onEvent: (event) => { events.push(event); if (event.type === 'complete' || event.type === 'error') resolve(event); },
   });
@@ -95,6 +99,9 @@ test('cancellation stops the engine and deletes only this run’s incomplete out
   let resolve;
   const done = new Promise((r) => { resolve = r; });
   const separator = new StemSeparationService({
+    // Legacy subprocess tests use tiny placeholder WAVs; real float WAV
+    // validation and level protection have their own regression suite.
+    peakGuard: async () => ({ gainDb: 0, peakBeforeDb: -3, peakAfterDb: -3, samplesOverFullScale: 0, enabled: true }),
     executable: 'demucs-test.exe',
     spawnProcess: fakeProcess(() => {}),
     onEvent: (event) => { if (event.type === 'canceled') resolve(event); },
@@ -119,6 +126,9 @@ test('engine failure and missing stems are reported without retaining partial ou
     let resolve;
     const done = new Promise((r) => { resolve = r; });
     const separator = new StemSeparationService({
+    // Legacy subprocess tests use tiny placeholder WAVs; real float WAV
+    // validation and level protection have their own regression suite.
+    peakGuard: async () => ({ gainDb: 0, peakBeforeDb: -3, peakAfterDb: -3, samplesOverFullScale: 0, enabled: true }),
       executable: 'demucs-test.exe',
       spawnProcess: fakeProcess(({ child }) => {
         child.stderr.emit('data', 'GPU device unavailable');
@@ -142,6 +152,9 @@ test('rejects unsupported inputs and concurrent separation without spawning', as
   const { root, input, outputRoot } = await tempFolder();
   let count = 0;
   const separator = new StemSeparationService({
+    // Legacy subprocess tests use tiny placeholder WAVs; real float WAV
+    // validation and level protection have their own regression suite.
+    peakGuard: async () => ({ gainDb: 0, peakBeforeDb: -3, peakAfterDb: -3, samplesOverFullScale: 0, enabled: true }),
     executable: 'demucs-test.exe',
     spawnProcess: (...args) => {
       count++;
@@ -158,4 +171,100 @@ test('rejects unsupported inputs and concurrent separation without spawning', as
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+
+test('allowlisted High Quality mode uses only the 6s and FT models', () => {
+  assert.deepEqual(STEM_MODES, ['standard', 'high-quality']);
+  assert.equal(validateStemMode('high-quality'), 'high-quality');
+  assert.throws(() => validateStemMode('../../anything'), /unsupported/);
+  assert.throws(() => buildStemCommand('song.wav', '/tmp', 'untrusted'), /unsupported/);
+  const stages = stemStages('high-quality', '/tmp/example');
+  assert.deepEqual(stages.map((s) => s.model), ['htdemucs_6s', 'htdemucs_ft']);
+  assert.deepEqual(stemStages('standard', '/tmp/example').map((s) => s.model), ['htdemucs_6s']);
+});
+
+test('High Quality combines fine-tuned drums/bass/vocals and six-stem guitar/piano/other', async () => {
+  const { root, input, outputRoot } = await tempFolder();
+  const launched = [];
+  const events = [];
+  let resolveFinish;
+  const finished = new Promise((resolve) => { resolveFinish = resolve; });
+  let receivedPaths = null;
+  const separator = new StemSeparationService({
+    executable: 'demucs-test.exe',
+    peakGuard: async (paths, opts) => {
+      receivedPaths = paths;
+      assert.equal(opts.enabled, true);
+      return { gainDb: -1.5, peakBeforeDb: 0.5, peakAfterDb: -1, enabled: true, samplesOverFullScale: 8 };
+    },
+    spawnProcess: fakeProcess(({ args, child }) => {
+      launched.push(args);
+      (async () => {
+        const model = args[2];
+        for (const name of model === 'htdemucs_ft'
+          ? ['drums', 'bass', 'other', 'vocals'] : STEM_NAMES) {
+          const marker = model === 'htdemucs_ft' ? 70 : 60;
+          await writeFile(join(args[4], name + '.wav'), Buffer.alloc(100, marker));
+        }
+        child.emit('close', 0);
+      })().catch((err) => child.emit('error', err));
+    }),
+    onEvent: (event) => {
+      events.push(event);
+      if (event.type === 'complete' || event.type === 'error') resolveFinish(event);
+    },
+  });
+  try {
+    const started = await separator.start({ inputPath: input, outputRoot, mode: 'high-quality' });
+    const result = await finished;
+    assert.equal(result.type, 'complete', result.message);
+    assert.equal(result.id, started.id);
+    assert.equal(result.mode, 'high-quality');
+    assert.equal(result.peak.gainDb, -1.5);
+    assert.equal(launched.length, 2);
+    assert.deepEqual(launched.map((args) => args[2]), ['htdemucs_6s', 'htdemucs_ft']);
+    assert.equal(events.filter((e) => e.type === 'stage').length, 2);
+    assert.equal(receivedPaths.length, 6);
+    for (const name of STEM_NAMES) {
+      const byte = (await readFile(join(started.outputDir, name + '.wav')))[0];
+      assert.equal(byte, ['drums', 'bass', 'vocals'].includes(name) ? 70 : 60);
+    }
+    assert.equal(separator.fileFor(started.id, 'guitar'), join(started.outputDir, 'guitar.wav'));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('cancellation during the FT stage aborts without exporting half-finished HQ stems', async () => {
+  const { root, input, outputRoot } = await tempFolder();
+  let resolveSecond;
+  const secondStarted = new Promise((resolve) => { resolveSecond = resolve; });
+  let resolveCanceled;
+  const canceled = new Promise((resolve) => { resolveCanceled = resolve; });
+  const separator = new StemSeparationService({
+    executable: 'demucs-test.exe',
+    peakGuard: async () => { throw new Error('guard should not run after cancel'); },
+    spawnProcess: fakeProcess(({ args, child }) => {
+      if (args[2] === 'htdemucs_ft') {
+        resolveSecond();
+        return;
+      }
+      (async () => {
+        for (const name of STEM_NAMES) {
+          await writeFile(join(args[4], name + '.wav'), Buffer.alloc(100, 1));
+        }
+        child.emit('close', 0);
+      })().catch((err) => child.emit('error', err));
+    }),
+    onEvent: (event) => { if (event.type === 'canceled') resolveCanceled(event); },
+  });
+  try {
+    const started = await separator.start({ inputPath: input, outputRoot, mode: 'high-quality' });
+    await secondStarted;
+    assert.equal(separator.cancel(), true);
+    const event = await canceled;
+    assert.equal(event.id, started.id);
+    await assert.rejects(stat(started.outputDir), { code: 'ENOENT' });
+  } finally { await rm(root, { recursive: true, force: true }); }
 });
