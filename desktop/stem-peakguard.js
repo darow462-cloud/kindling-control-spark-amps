@@ -33,7 +33,7 @@ export async function readFloatWavInfo(path) {
         riff.toString('ascii', 8, 12) !== 'WAVE') throw new Error('Invalid RIFF WAV header');
 
     let offset = 12;
-    let audioFormat = null;
+    let isFloatFormat = false;
     let bits = null;
     let channels = null;
     let sampleRate = null;
@@ -47,13 +47,22 @@ export async function readFloatWavInfo(path) {
       if (tag === 'fmt ') {
         if (size < 16 || size > 128) throw new Error('Unsupported WAV fmt chunk');
         const fmt = await readExactly(file, size, begin);
-        audioFormat = fmt.readUInt16LE(0);
+        const tag = fmt.readUInt16LE(0);
         channels = fmt.readUInt16LE(2);
         sampleRate = fmt.readUInt32LE(4);
         bits = fmt.readUInt16LE(14);
         const align = fmt.readUInt16LE(12);
-        if (audioFormat !== 3 || bits !== 32 || channels !== 2 || align !== 8 || !sampleRate) {
-          throw new Error('Expected stereo 32-bit float WAV from the separation engine');
+        // Demucs outputs may be WAVE_FORMAT_EXTENSIBLE (0xFFFE) rather
+        // than legacy IEEE_FLOAT (3), with a 40-byte fmt chunk. Verify
+        // the EXACT IEEE_FLOAT subformat GUID instead of trusting the tag.
+        const ieeeFloatGuid = Buffer.from('0300000000001000800000aa00389b71', 'hex');
+        const extensibleFloat = tag === 0xfffe && size >= 40 &&
+          fmt.readUInt16LE(16) >= 22 &&
+          fmt.readUInt16LE(18) === 32 &&
+          fmt.subarray(24, 40).equals(ieeeFloatGuid);
+        isFloatFormat = tag === 3 || extensibleFloat;
+        if (!isFloatFormat || bits !== 32 || channels !== 2 || align !== 8 || !sampleRate) {
+          throw new Error('Expected stereo 32-bit float WAV/WAVEX from the separation engine');
         }
       }
       if (tag === 'data') {
@@ -62,7 +71,7 @@ export async function readFloatWavInfo(path) {
       }
       offset = begin + size + (size % 2);
     }
-    if (audioFormat !== 3 || bits !== 32 || channels !== 2 ||
+    if (!isFloatFormat || bits !== 32 || channels !== 2 ||
         !data || data.bytes % 8 !== 0 || !data.bytes) {
       throw new Error('Expected a nonempty stereo 32-bit float WAV');
     }
