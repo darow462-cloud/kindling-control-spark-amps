@@ -48,6 +48,7 @@
         <li><a href="#tuner">Tuner</a></li>
         <li><a href="#console">Console</a></li>
         <li><a href="#analysis">Analyze guitar tone (experimental)</a></li>
+        <li><a href="#stems">Separating a song into stems (Windows)</a></li>
         <li><a href="#capture">Capture</a></li>
         <li><a href="#troubleshooting">Troubleshooting</a></li>
         <li><a href="#settings">Settings and About</a></li>
@@ -286,6 +287,20 @@
       </section>
 
       <!-- ------------------------------------------------------------------ -->
+      <section id="stems">
+        <h2>Separate a song into six instrument tracks (Windows experimental)</h2>
+        <p>The native Windows Portable build can split your own audio file into separate <strong>drums, bass, vocals, guitar, piano and other</strong> WAV files using HTDemucs 6-stem. This is machine-learning inference on your computer, not an EQ filter or cloud service. The model weights (~84 MB) are downloaded once from Hugging Face and then cached for future uses.</p>
+        <ol>
+          <li>Open <strong>Stems</strong> and choose a WAV, MP3, FLAC, M4A or other listed input audio file.</li>
+          <li>Choose the output folder. Each job uses its own new subfolder so it does not overwrite existing WAVs.</li>
+          <li>Press <strong>Separate into 6 tracks</strong>. For the first run, allow the model download and initial shader setup. A Vulkan-capable GPU and adequate memory are recommended. The process may take some time; the app shows engine status instead of claiming a precise percentage.</li>
+          <li>After success, use individual audio players to listen to each stem. Use <strong>Open WAV output folder</strong> to edit or mix them in a DAW. The individual players are for auditioning and do not offer sample-accurate synchronized mixing.</li>
+          <li>Press <strong>Analyze guitar stem</strong> to import the generated guitar WAV into the Analyze tab as the reference. Record your own guitar or load a recording there for comparison.</li>
+        </ol>
+        <p><strong>Privacy and safety:</strong> the song and generated WAV files stay on your computer; no audio is uploaded to a cloud source separation service. The first-run model download needs internet. Canceling removes only the unfinished run's new folder, not the selected destination or prior finished files. You choose where to save the WAV files.</p>
+        <p><strong>Limitations:</strong> in dense metal mixes, the isolated guitar may still contain bass or cymbals, and several guitars may be combined into one guitar stem. The six outputs are estimates, not the original studio multitrack session. Browser and mobile builds currently do not include the native Windows engine.</p>
+      </section>
+
       <section id="analysis">
         <h2>Analyze guitar tone (experimental)</h2>
         <p>The <strong>Analyze</strong> tab is an optional, entirely local tool for comparing a reference riff with your guitar track. It does not modify the amp, presets or Bluetooth connection, and cannot determine exact settings from a recording.</p>
