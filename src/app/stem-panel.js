@@ -10,7 +10,8 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
   const supported = !!api?.supported;
   const warn = $('stem-support-warning');
   warn.hidden = supported;
-  const state = { file: null, output: null, running: false, stems: [], activeId: null };
+  const state = { file: null, output: null, running: false, stems: [], activeId: null,
+    mode: 'standard', peak: null };
 
   function status(text, kind = '') {
     const element = $('stem-status');
@@ -25,6 +26,8 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
     $('stem-cancel').disabled = !supported || !state.running;
     $('stem-open-folder').disabled = !supported || !state.stems.length;
     $('stem-analyze-guitar').disabled = !state.stems.some((stem) => stem.name === 'guitar');
+    $('stem-quality').disabled = state.running;
+    $('stem-protect-peaks').disabled = state.running;
     $('stem-progress').hidden = !state.running;
   }
 
@@ -90,12 +93,19 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
     if (state.running) return;
     state.running = true;
     state.stems = [];
+    state.peak = null;
+    state.mode = $('stem-quality').value;
     clearPlayers();
     $('stem-results').hidden = true;
-    status('Starting HTDemucs 6-stem. First use downloads the 84 MB model locally…');
+    status(state.mode === 'high-quality'
+      ? 'Starting dual-model High Quality separation; first use may download 84 + 333 MB of model weights…'
+      : 'Starting six-stem separation; first use may download 84 MB of model weights…');
     updateButtons();
     try {
-      const result = await api.start();
+      const result = await api.start({
+        mode: state.mode,
+        protectPeaks: $('stem-protect-peaks').checked,
+      });
       state.activeId = result.id;
       status('Separating… model setup and first-time GPU shaders may take a while.');
     } catch (err) {
@@ -110,15 +120,24 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
     if (event.type === 'started') {
       state.activeId = event.id;
       state.running = true;
+      state.mode = event.mode || 'standard';
       status('Separation started. Working entirely on your computer…');
     } else if (event.id && event.id !== state.activeId) {
       return; // ignore stale finish/progress from a previous job
+    } else if (event.type === 'stage') {
+      status(`Step ${event.index} of ${event.total}: ${event.label}. ${event.index > 1 ? 'This model runs separately and takes longer.' : ''}`);
     } else if (event.type === 'progress') {
-      status(event.text || 'Separating…');
+      status(`${event.total > 1 ? `Step ${event.stage}/${event.total}: ` : ''}${event.text || 'Separating…'}`);
     } else if (event.type === 'complete') {
       state.running = false;
       state.stems = Array.isArray(event.stems) ? event.stems : [];
-      status(`Done. ${state.stems.length} WAV tracks saved to ${event.outputDir}`, 'success');
+      state.peak = event.peak || null;
+      const gain = state.peak && state.peak.gainDb < -0.01
+        ? ` Fixed headroom: ${state.peak.gainDb.toFixed(1)} dB applied equally to all tracks.`
+        : state.peak && state.peak.samplesOverFullScale > 0 && !state.peak.enabled
+          ? ' Warning: peak protection was off; some samples exceed 0 dBFS.'
+          : ' No peak reduction needed.';
+      status(`Done (${state.mode === 'high-quality' ? 'High Quality' : 'Standard'}). ${state.stems.length} WAV tracks saved to ${event.outputDir}.${gain}`, 'success');
       renderStems();
     } else if (event.type === 'canceled') {
       state.running = false;
@@ -130,6 +149,12 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
     updateButtons();
   }
 
+  $('stem-quality').addEventListener('change', () => {
+    const high = $('stem-quality').value === 'high-quality';
+    $('stem-quality-hint').textContent = high
+      ? 'Runs two models: fine-tuned drums/bass/vocals; six-stem guitar/piano/other. This can improve some instruments but will be much slower and is not guaranteed to fix artifacts.'
+      : 'Uses the existing 6-stem model for every track. Faster, less GPU time.';
+  });
   $('stem-select-file').addEventListener('click', () => choose('file'));
   $('stem-select-output').addEventListener('click', () => choose('output'));
   $('stem-start').addEventListener('click', start);
