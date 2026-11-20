@@ -579,26 +579,32 @@ const rig = createRig({
   root: $('#rig'),
   state,
   actions: {
+    isBusy: () => toneBusy,
+    onEdit: recordToneEdit,
     setParam: (effect, p, v) => state.client?.setParam(effect, p, v).catch((e) => (logLine('err', e.message), reportError('set-param', e))),
     setOnOff: (effect, on) => state.client?.setEffectOnOff(effect, on).catch((e) => (logLine('err', e.message), reportError('set-on-off', e))),
     async changeEffect(from, to) {
+      if (toneBusy) return false;
       if (!state.connected) {
         const fx = state.preset.pedals.find((f) => f.name === from);
         if (fx) Object.assign(fx, { name: to, params: defaultParams(to, fx.params.length) });
-        state.unsaved = true;
+        recordToneEdit('model');
         renderPreset();
         return true;
       }
+      toneBusy = true;
+      updateToneTools();
       try {
+        await flushToneWrites();
         const { method, preset } = await state.client.swapEffect(from, to);
         state.preset = preset;
         if (method === 'preset') {
           state.slot = TEMP_SLOT;
-          state.unsaved = true;
           highlightSlot();
           logLine('info', `swap ${from} → ${to}: amp did not apply 01 06; loaded the edited preset into the temporary slot`);
           toast('The amp did not apply the quick model change. The edited tone is now in the temporary slot; nothing stored changed. Use Save… to keep it.');
         }
+        recordToneEdit('model');
         renderPreset();
         return true;
       } catch (err) {
@@ -606,24 +612,31 @@ const rig = createRig({
         reportError('change-effect', err);
         toast(`Couldn't change the model: ${err.message}`, 'warn', { label: 'Troubleshooting', run: () => openHelp('troubleshooting') });
         return false;
+      } finally {
+        toneBusy = false;
+        updateToneTools();
       }
     },
     async applyOrder(pedals) {
+      if (toneBusy) return;
       if (!state.connected) {
         state.preset = { ...state.preset, pedals };
-        state.unsaved = true;
+        recordToneEdit('chain');
         renderPreset();
         toast('Chain order changed. Connect to an amp to try it.');
         return;
       }
+      toneBusy = true;
+      updateToneTools();
       try {
+        await flushToneWrites();
         toast('Trying the new order on the amp (temporary slot, nothing stored changes)…');
         const tone = await liveTone();
         const { accepted, preset } = await state.client.tryChainOrder({ ...tone, pedals: pedals.map((fx) => tone.pedals.find((t) => t.name === fx.name) ?? fx) });
         state.slot = TEMP_SLOT;
-        state.unsaved = true;
         highlightSlot();
         state.preset = preset;
+        recordToneEdit('chain');
         renderPreset();
         logLine('info', `chain reorder ${accepted ? 'kept' : 'normalised'} by amp: ${preset.pedals.map((f) => f.name).join(' → ')}`);
         toast(
@@ -636,6 +649,9 @@ const rig = createRig({
         logLine('err', `reorder failed: ${err.message}`);
         reportError('reorder', err);
         toast(`Reorder failed: ${err.message}`, 'warn');
+      } finally {
+        toneBusy = false;
+        updateToneTools();
       }
     },
   },
