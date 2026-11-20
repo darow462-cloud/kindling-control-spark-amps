@@ -654,6 +654,23 @@ dialog#bt-picker h2 { margin: 0 0 0.5rem; font-size: 1.1rem; }
   border: 1px solid var(--border); border-radius: 0.45rem;
 }
 #guitars-dialog textarea { resize: vertical; }
+
+/* Optional organizer details in the existing Save dialog. */
+.save-organizer {
+  border: 1px solid var(--border); border-radius: 0.65rem;
+  padding: 0.5rem 0.7rem; margin: 0.3rem 0;
+  background: var(--bg-2);
+}
+.save-organizer summary { color: var(--text); font-weight: 650; cursor: pointer; }
+.save-organizer-fields { display: grid; gap: 0.35rem; padding-top: 0.65rem; }
+.save-organizer-fields label:not(.row) { color: var(--muted); font-size: 0.85rem; }
+.save-organizer-fields input:not([type="checkbox"]), .save-organizer-fields select {
+  font: inherit; width: 100%; min-height: 2.3rem; padding: 0.35rem 0.55rem;
+  border-radius: 0.45rem; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text);
+}
+.save-organizer-fields .hint { margin: 0 0 0.15rem; }
+
 .guitar-profile-list {
   padding: 0; margin: 0.35rem 0 0.7rem; list-style: none;
   max-height: 10rem; overflow-y: auto; display: grid; gap: 0.35rem;

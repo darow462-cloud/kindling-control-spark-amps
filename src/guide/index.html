@@ -195,11 +195,13 @@
         <p>Use <strong>Search</strong> to find a preset by name, artist, song, tag or guitar. You can filter by <strong>Artist</strong>, <strong>Guitar</strong> or <strong>★ Favorites</strong>. Click the star on a preset card to add or remove it from favorites.</p>
         <p><strong>Details</strong> opens the preset organizer. Enter an artist, song, tags separated by commas and an optional guitar profile. These notes live in your local library; editing them never changes the sound sent to the amp.</p>
         <p><strong>Guitar profiles…</strong> lets you add, edit or delete instruments with their tuning, pickups, selected Voice and notes. Associate a profile with a preset using <strong>Details</strong>. Deleting a guitar leaves all presets intact and only clears their association.</p>
+        <p><strong>Save…</strong> also has an optional expandable Artist, Song, Tags and Guitar section, so you can organize a tone as you save it to My presets. These labels are not transmitted to your amplifier.</p>
+        <p><strong>Back up entire library…</strong> saves every local preset, its tags, favorites and saved date, plus all guitar profiles into one JSON file. Use <strong>Restore library backup…</strong> on another Portable build to merge those records into its local library. You'll see a preview and confirmation before import. Identical items are skipped, and conflicting entries are imported as new copies rather than overwriting your existing sounds. This does not write to the Spark amplifier.</p>
         <ul>
           <li><strong>Load</strong> plays the preset on the amp, using the temporary slot. Your stored presets aren't touched. To make it one of the amp's presets, press <strong>Save…</strong> and choose a slot.</li>
           <li><strong>Export</strong> downloads the preset as a <code>.json</code> file, including optional artist/song/tags/favorite data and a copy of its assigned guitar profile. Original Spark preset fields remain unchanged, and this extra information is ignored by the amp.</li>
           <li><strong>Delete</strong> removes it from this device only; presets stored on the amp aren't affected.</li>
-          <li><strong>Import JSON…</strong> adds ordinary preset files from other Spark tools, or restores the optional organizer and guitar details from a KindlingControl export. You can pick several files at once.</li>
+          <li><strong>Import preset JSON…</strong> adds ordinary preset files from other Spark tools, or restores the optional organizer and guitar details from a KindlingControl export. You can pick several files at once.</li>
           <li><strong>Export current tone</strong> saves whatever the amp is playing right now as a file.</li>
         </ul>
         <p class="note">

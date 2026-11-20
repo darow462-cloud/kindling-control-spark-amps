@@ -105,7 +105,9 @@
       <div class="row library-actions">
         <p class="library-note">Presets saved on this device. Load one onto the amp to play it, or store it in one of the amp's preset slots.
           Find more, or share yours, on the <a href="https://kindlingcontrol.app/presets/" target="_blank" rel="noopener">presets hub</a>.</p>
-        <label class="button">Import JSON…<input type="file" id="import" accept=".json,application/json" multiple hidden></label>
+        <label class="button">Import preset JSON…<input type="file" id="import" accept=".json,application/json" multiple hidden></label>
+        <button type="button" id="backup-export">Back up entire library…</button>
+        <label class="button">Restore library backup…<input type="file" id="backup-import" accept=".json,application/json" hidden></label>
         <button type="button" id="export-current" disabled>Export current tone</button>
         <button type="button" class="help-link" data-help="library" aria-label="Help: the Presets tab">?</button>
       </div>
@@ -270,6 +272,21 @@
       <label for="save-desc">Description <small>(optional)</small></label>
       <input id="save-desc" maxlength="60" autocomplete="off">
       <label class="row"><input type="checkbox" id="save-library" checked> Save to My presets on this device</label>
+      <details id="save-organizer" class="save-organizer">
+        <summary>Artist, song, tags &amp; guitar (optional)</summary>
+        <div class="save-organizer-fields">
+          <p class="hint">Library labels are stored locally and do not change the amp sound.</p>
+          <label for="save-artist">Artist</label>
+          <input id="save-artist" maxlength="80" autocomplete="off" placeholder="Children of Bodom">
+          <label for="save-song">Song</label>
+          <input id="save-song" maxlength="80" autocomplete="off" placeholder="Sixpounder">
+          <label for="save-tags">Tags (comma-separated)</label>
+          <input id="save-tags" maxlength="400" autocomplete="off" placeholder="Rhythm, Drop C">
+          <label for="save-guitar">Guitar profile</label>
+          <select id="save-guitar"><option value="">Not assigned</option></select>
+          <label class="row"><input type="checkbox" id="save-favorite"> Favorite ★</label>
+        </div>
+      </details>
       <label for="save-slot">Store on the amp</label>
       <select id="save-slot"></select>
       <p id="save-warning" class="hint warn" hidden></p>
