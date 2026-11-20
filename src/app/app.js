@@ -790,16 +790,57 @@ for (const id of ['library-search', 'library-artist-filter', 'library-guitar-fil
 }
 renderLibrary();
 
+// Full-library backups can migrate data across differently named Portable
+// builds. They are generated/read entirely locally; no Bluetooth commands.
+$('#backup-export').addEventListener('click', () => {
+  const backup = exportLibraryBackup(state.library, state.guitars);
+  const date = new Date().toISOString().slice(0, 10);
+  download(`kindlingcontrol-library-backup-${date}`, backup);
+  toast(`Library backup exported: ${backup.presets.length} presets, ${backup.guitars.length} guitar profiles.`, 'ok');
+});
+
+$('#backup-import').addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    if (file.size > 16 * 1024 * 1024) throw new Error('backup file is too large (16 MB limit)');
+    const plan = planLibraryBackupImport(await file.text(), state.library, state.guitars);
+    const count = plan.summary;
+    const text = [
+      `Restore backup "${file.name}"?`,
+      `Add ${count.presetsToAdd} presets and ${count.guitarProfilesToAdd} guitar profiles.`,
+      `${count.identicalPresetsSkipped} identical presets will be skipped.`,
+      `${count.conflictsKeptAsCopies} presets with conflicting IDs will be imported as copies.`,
+      'Existing presets and guitar profiles will not be overwritten.',
+      'This affects only the local library, not the amp.',
+    ].join('\n');
+    if (!confirm(text)) return;
+    applyLibraryBackupPlan(plan, state.library, state.guitars);
+    logLine('info', `backup imported: ${count.presetsToAdd} presets, ${count.guitarProfilesToAdd} guitars; ${count.identicalPresetsSkipped} skipped`);
+    toast(`Backup restored: ${count.presetsToAdd} presets and ${count.guitarProfilesToAdd} guitar profiles added.`, 'ok');
+  } catch (err) {
+    logLine('err', `library backup restore failed: ${err.message}`);
+    alert(`Could not restore library backup: ${err.message}`);
+  }
+});
+
 $('#import').addEventListener('change', async (e) => {
   const files = [...e.target.files];
   e.target.value = '';
   let ok = 0;
+  let copies = 0;
   for (const file of files) {
     try {
       const raw = JSON.parse(await file.text());
       const preset = presetFromJson(raw);
       if (!Array.isArray(preset.pedals) || !preset.pedals.length) throw new Error('no effects in file');
-      const uuid = preset.uuid || randomUuid();
+      let uuid = preset.uuid || randomUuid();
+      if (state.library.get(uuid)) {
+        // Importing a preset must never silently replace an existing tone.
+        do { uuid = randomUuid(); } while (state.library.get(uuid));
+        copies++;
+      }
       state.library.save({ ...preset, uuid });
       importOrganizer(raw, uuid);
       ok++;
@@ -808,7 +849,10 @@ $('#import').addEventListener('change', async (e) => {
       alert(`Could not import ${file.name}: ${err.message}`);
     }
   }
-  if (ok) logLine('info', `imported ${ok} preset${ok > 1 ? 's' : ''} into My presets`);
+  if (ok) {
+    logLine('info', `imported ${ok} preset${ok > 1 ? 's' : ''} into My presets${copies ? ` (${copies} as new copies to avoid overwriting)` : ''}`);
+    if (copies) toast(`${copies} existing preset ID(s) were preserved; imported files were added as copies.`);
+  }
 });
 
 $('#export-current').addEventListener('click', async () => {
