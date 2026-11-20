@@ -17,7 +17,8 @@ import {
   defaultParams,
   randomUuid,
 } from '../spark/index.js';
-import { PresetLibrary } from './library.js';
+import { PresetLibrary, normalizePresetMeta } from './library.js';
+import { GuitarProfileLibrary } from './guitar-profiles.js';
 import { createRig } from './rig.js';
 import { ToneSession } from './tone-session.js';
 import { planToneDelta } from './tone-diff.js';
@@ -64,6 +65,7 @@ const state = {
   lastIndex: 0, // position (0-3) within the bank of the last hardware preset
   unsaved: false, // live tone came from New and hasn't been saved yet
   library: new PresetLibrary(),
+  guitars: new GuitarProfileLibrary(),
   presetSlots: 4, // 8 on Spark 2
   mock: null,
 };
@@ -542,53 +544,239 @@ $('#save-dialog').addEventListener('close', async () => {
   }
 });
 
-// ---- Library tab ------------------------------------------------------------
+// ---- Library tab / preset organization / guitar profiles --------------------
+
+let organizerUuid = null;
+const sortText = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
+
+function setOptions(select, entries, first) {
+  const selected = select.value;
+  select.replaceChildren(new Option(first, ''), ...entries.map(({ label, value }) => new Option(label, value)));
+  select.value = entries.some((x) => x.value === selected) ? selected : '';
+}
+
+function renderGuitarOptions(select) {
+  const items = state.guitars.list().map((p) => ({ label: p.name, value: p.id }));
+  setOptions(select, items, select.id === 'organize-guitar' ? 'Not assigned' : 'All guitars');
+}
+
+function openPresetOrganizer(uuid) {
+  const meta = state.library.metadata(uuid);
+  if (!meta) return;
+  organizerUuid = uuid;
+  $('#organize-artist').value = meta.artist;
+  $('#organize-song').value = meta.song;
+  $('#organize-tags').value = meta.tags.join(', ');
+  $('#organize-favorite').checked = meta.favorite;
+  renderGuitarOptions($('#organize-guitar'));
+  $('#organize-guitar').value = state.guitars.get(meta.guitarProfileId) ? meta.guitarProfileId : '';
+  $('#organize-dialog').showModal();
+  $('#organize-artist').focus();
+}
+
+$('#organize-dialog').addEventListener('close', () => {
+  const uuid = organizerUuid;
+  organizerUuid = null;
+  if ($('#organize-dialog').returnValue !== 'ok' || !uuid) return;
+  state.library.updateMetadata(uuid, {
+    artist: $('#organize-artist').value,
+    song: $('#organize-song').value,
+    tags: $('#organize-tags').value,
+    favorite: $('#organize-favorite').checked,
+    guitarProfileId: $('#organize-guitar').value,
+  });
+});
+
+function fillGuitarForm(profile = null) {
+  $('#guitar-id').value = profile?.id ?? '';
+  $('#guitar-name').value = profile?.name ?? '';
+  $('#guitar-tuning').value = profile?.tuning ?? '';
+  $('#guitar-pickups').value = profile?.pickups ?? '';
+  $('#guitar-voice').value = profile?.voice ?? '';
+  $('#guitar-notes').value = profile?.notes ?? '';
+  $('#guitar-delete').disabled = !profile?.id;
+}
+
+function renderGuitarList() {
+  const profiles = state.guitars.list();
+  const list = $('#guitars-list');
+  list.replaceChildren(...profiles.map((p) => {
+    const li = document.createElement('li');
+    const details = Object.assign(document.createElement('div'), {
+      className: 'guitar-profile-info',
+      textContent: [p.name, p.tuning, p.pickups, p.voice].filter(Boolean).join(' · '),
+    });
+    const edit = Object.assign(document.createElement('button'), { type: 'button', textContent: 'Edit' });
+    edit.addEventListener('click', () => fillGuitarForm(p));
+    li.append(details, edit);
+    return li;
+  }));
+  if (!profiles.length) list.append(Object.assign(document.createElement('li'), {
+    className: 'library-note', textContent: 'No guitar profiles yet.',
+  }));
+}
+
+$('#guitars-open').addEventListener('click', () => {
+  fillGuitarForm();
+  renderGuitarList();
+  $('#guitars-dialog').showModal();
+});
+$('#guitars-close').addEventListener('click', () => $('#guitars-dialog').close());
+$('#guitar-new').addEventListener('click', () => {
+  fillGuitarForm();
+  $('#guitar-name').focus();
+});
+$('#guitar-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  try {
+    const saved = state.guitars.save({
+      id: $('#guitar-id').value,
+      name: $('#guitar-name').value,
+      tuning: $('#guitar-tuning').value,
+      pickups: $('#guitar-pickups').value,
+      voice: $('#guitar-voice').value,
+      notes: $('#guitar-notes').value,
+    });
+    fillGuitarForm(saved);
+    renderGuitarList();
+    toast(`Saved guitar profile: ${saved.name}`, 'ok');
+  } catch (err) {
+    toast(`Couldn't save guitar profile: ${err.message}`, 'warn');
+  }
+});
+$('#guitar-delete').addEventListener('click', () => {
+  const id = $('#guitar-id').value;
+  const profile = state.guitars.get(id);
+  if (!profile || !confirm(`Delete guitar profile "${profile.name}"? Presets will be kept, but their guitar association will be cleared.`)) return;
+  state.guitars.remove(id);
+  state.library.unlinkGuitarProfile(id);
+  fillGuitarForm();
+  renderGuitarList();
+});
+state.guitars.addEventListener('change', () => {
+  renderLibrary();
+  renderGuitarList();
+});
+
+function presetExportWithOrganizer(uuid) {
+  const preset = state.library.get(uuid);
+  const meta = state.library.metadata(uuid);
+  const guitar = state.guitars.get(meta?.guitarProfileId);
+  if (!preset) return null;
+  // Extra key is optional; original Ignitron-compatible preset fields remain.
+  return {
+    ...presetToJson(preset),
+    KindlingControl: {
+      organizer: { ...meta, guitarProfileId: '' },
+      guitar: guitar ? { ...guitar, id: '' } : null,
+    },
+  };
+}
+
+function importOrganizer(raw, uuid) {
+  const organizer = raw?.KindlingControl?.organizer;
+  if (!organizer || typeof organizer !== 'object') return;
+  const meta = normalizePresetMeta(organizer);
+  const exportedGuitar = raw.KindlingControl.guitar;
+  if (exportedGuitar && typeof exportedGuitar === 'object' && typeof exportedGuitar.name === 'string' && exportedGuitar.name.trim()) {
+    const profiles = state.guitars.list();
+    let profile = profiles.find((p) =>
+      [p.name, p.tuning, p.pickups, p.voice].every((v, i) =>
+        v === [exportedGuitar.name, exportedGuitar.tuning ?? '', exportedGuitar.pickups ?? '', exportedGuitar.voice ?? ''][i]));
+    if (!profile) profile = state.guitars.save({ ...exportedGuitar, id: '' });
+    meta.guitarProfileId = profile.id;
+  } else {
+    meta.guitarProfileId = '';
+  }
+  state.library.updateMetadata(uuid, meta);
+}
 
 function renderLibrary() {
-  const items = state.library.list();
+  const all = state.library.list();
+  const filterArtist = $('#library-artist-filter');
+  const artists = [...new Set(all.map((p) => p.metadata.artist).filter(Boolean))]
+    .sort(sortText).map((artist) => ({ label: artist, value: artist }));
+  setOptions(filterArtist, artists, 'All artists');
+  renderGuitarOptions($('#library-guitar-filter'));
+
+  const query = $('#library-search').value.trim().toLocaleLowerCase();
+  const artist = filterArtist.value;
+  const guitarId = $('#library-guitar-filter').value;
+  const favoritesOnly = $('#library-favorites-only').checked;
+  const filtered = all.filter((p) => {
+    const meta = p.metadata;
+    if (artist && meta.artist !== artist) return false;
+    if (guitarId && meta.guitarProfileId !== guitarId) return false;
+    if (favoritesOnly && !meta.favorite) return false;
+    const guitar = state.guitars.get(meta.guitarProfileId);
+    const haystack = [p.name, p.description, meta.artist, meta.song, ...meta.tags, guitar?.name ?? ''].join(' ').toLocaleLowerCase();
+    return haystack.includes(query);
+  });
+  $('#library-empty').hidden = all.length > 0;
+  $('#library-storage-warning').hidden = state.library.persistent && state.guitars.persistent;
+  $('#library-results').textContent = all.length ? `Showing ${filtered.length} of ${all.length} saved presets` : '';
+
   const list = $('#library');
-  $('#library-empty').hidden = items.length > 0;
-  $('#library-storage-warning').hidden = state.library.persistent;
-  list.replaceChildren(
-    ...items.map((p) => {
-      const li = document.createElement('li');
-      li.classList.toggle('active', p.uuid === state.preset?.uuid);
-      const name = Object.assign(document.createElement('div'), { className: 'lib-name', textContent: p.name });
-      const amp = p.pedals.find((f) => findEffect(f.name)?.slot === 'amp') ?? p.pedals[3];
-      const meta = Object.assign(document.createElement('div'), {
-        className: 'lib-meta',
-        textContent: [p.description, findEffect(amp?.name)?.name ?? amp?.name, p.savedAt ? `saved ${new Date(p.savedAt).toLocaleDateString()}` : ''].filter(Boolean).join(' · '),
-      });
-      const actions = document.createElement('div');
-      actions.className = 'lib-actions';
-      const btn = (label, fn, cls = '') => {
-        const b = Object.assign(document.createElement('button'), { type: 'button', textContent: label, className: cls });
-        b.addEventListener('click', fn);
-        actions.append(b);
-        return b;
-      };
-      btn('Load', async () => {
-        if (state.unsaved && !confirm('Your new preset is not saved yet. Load this one anyway?')) return;
-        try {
-          await makeLive(state.library.get(p.uuid));
-          state.unsaved = false;
-          renderPresetHeader();
-          selectTab($('#tab-tone'));
-        } catch (err) {
-          logLine('err', `load failed: ${err.message}`);
-          reportError('load-preset', err);
-        }
-      }, 'primary');
-      btn('Export', () => download(p.name, presetToJson(state.library.get(p.uuid))));
-      btn('Delete', () => {
-        if (confirm(`Delete "${p.name}" from My presets? (Presets stored on the amp are not affected.)`)) state.library.remove(p.uuid);
-      });
-      li.append(name, meta, actions);
-      return li;
-    }),
-  );
+  list.replaceChildren(...filtered.map((p) => {
+    const li = document.createElement('li');
+    li.classList.toggle('active', p.uuid === state.preset?.uuid);
+    const header = document.createElement('div');
+    header.className = 'lib-header';
+    const name = Object.assign(document.createElement('div'), { className: 'lib-name', textContent: p.name });
+    const star = Object.assign(document.createElement('button'), {
+      type: 'button', className: 'lib-star',
+      textContent: p.metadata.favorite ? '★' : '☆',
+      title: p.metadata.favorite ? 'Remove from favorites' : 'Add to favorites',
+    });
+    star.setAttribute('aria-label', star.title);
+    star.setAttribute('aria-pressed', String(p.metadata.favorite));
+    star.addEventListener('click', () => state.library.updateMetadata(p.uuid, { favorite: !p.metadata.favorite }));
+    header.append(name, star);
+    const amp = p.pedals.find((f) => findEffect(f.name)?.slot === 'amp') ?? p.pedals[3];
+    const guitar = state.guitars.get(p.metadata.guitarProfileId);
+    const detail = Object.assign(document.createElement('div'), {
+      className: 'lib-meta',
+      textContent: [
+        [p.metadata.artist, p.metadata.song].filter(Boolean).join(' — '),
+        guitar ? `Guitar: ${guitar.name}` : '',
+        p.metadata.tags.join(', '),
+        findEffect(amp?.name)?.name ?? amp?.name,
+        p.savedAt ? `saved ${new Date(p.savedAt).toLocaleDateString()}` : '',
+      ].filter(Boolean).join(' · '),
+    });
+    const actions = document.createElement('div');
+    actions.className = 'lib-actions';
+    const btn = (label, fn, cls = '') => {
+      const b = Object.assign(document.createElement('button'), { type: 'button', textContent: label, className: cls });
+      b.addEventListener('click', fn);
+      actions.append(b);
+      return b;
+    };
+    btn('Load', async () => {
+      if (state.unsaved && !confirm('Your new preset is not saved yet. Load this one anyway?')) return;
+      try {
+        await makeLive(state.library.get(p.uuid));
+        state.unsaved = false;
+        renderPresetHeader();
+        selectTab($('#tab-tone'));
+      } catch (err) {
+        logLine('err', `load failed: ${err.message}`);
+        reportError('load-preset', err);
+      }
+    }, 'primary');
+    btn('Details', () => openPresetOrganizer(p.uuid));
+    btn('Export', () => download(p.name, presetExportWithOrganizer(p.uuid)));
+    btn('Delete', () => {
+      if (confirm(`Delete "${p.name}" from My presets? (Presets stored on the amp are not affected.)`)) state.library.remove(p.uuid);
+    });
+    li.append(header, detail, actions);
+    return li;
+  }));
 }
 state.library.addEventListener('change', renderLibrary);
+for (const id of ['library-search', 'library-artist-filter', 'library-guitar-filter', 'library-favorites-only']) {
+  $('#' + id).addEventListener(id === 'library-search' ? 'input' : 'change', renderLibrary);
+}
 renderLibrary();
 
 $('#import').addEventListener('change', async (e) => {
@@ -597,9 +785,12 @@ $('#import').addEventListener('change', async (e) => {
   let ok = 0;
   for (const file of files) {
     try {
-      const preset = presetFromJson(JSON.parse(await file.text()));
+      const raw = JSON.parse(await file.text());
+      const preset = presetFromJson(raw);
       if (!Array.isArray(preset.pedals) || !preset.pedals.length) throw new Error('no effects in file');
-      state.library.save({ ...preset, uuid: preset.uuid || randomUuid() });
+      const uuid = preset.uuid || randomUuid();
+      state.library.save({ ...preset, uuid });
+      importOrganizer(raw, uuid);
       ok++;
     } catch (err) {
       logLine('err', `import of ${file.name} failed: ${err.message}`);
