@@ -190,13 +190,23 @@ app.whenReady().then(() => {
     stemOutput = picker.filePaths[0];
     return { path: stemOutput };
   });
-  ipcMain.handle('stem:start', async (event) => {
+  ipcMain.handle('stem:start', async (event, options = {}) => {
     if (!trustedMain(event)) throw new Error('Untrusted app window');
     if (!stemInput || !stemOutput) throw new Error('Select an audio file and an output folder first');
     if (!existsSync(enginePath())) {
       throw new Error('The Demucs separation engine is not bundled in this build. Use the Windows Portable build with native stems support.');
     }
-    return stemService.start({ inputPath: stemInput, outputRoot: stemOutput });
+    // Renderer can select one of two fixed modes and toggle safe headroom.
+    // Native executable, filesystem paths and CLI arguments remain main-owned.
+    if (!options || typeof options !== 'object' ||
+        !['standard', 'high-quality'].includes(options.mode) ||
+        typeof options.protectPeaks !== 'boolean') {
+      throw new Error('Invalid separation settings');
+    }
+    return stemService.start({
+      inputPath: stemInput, outputRoot: stemOutput,
+      mode: options.mode, protectPeaks: options.protectPeaks,
+    });
   });
   ipcMain.handle('stem:cancel', async (event) => {
     if (!trustedMain(event)) throw new Error('Untrusted app window');
