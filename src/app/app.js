@@ -85,6 +85,9 @@ function updateToneTools() {
   }
   $('#tone-copy').disabled = !ready || toneBusy;
   $('#tone-copy').textContent = `Copy ${toneSession.active} → ${toneSession.active === 'A' ? 'B' : 'A'}`;
+  $('#new-preset').disabled = toneBusy;
+  $('#save-preset').disabled = !state.preset || toneBusy;
+  $('#refresh').disabled = !state.connected || toneBusy;
   $('#rig').inert = toneBusy;
 }
 
@@ -657,6 +660,59 @@ const rig = createRig({
   },
 });
 
+// History operations only become final once the amp has loaded and returned the
+// restored tone. A failed Bluetooth transfer leaves the Undo/Redo stacks intact.
+async function replayTone(direction) {
+  if (toneBusy || !state.preset) return;
+  const target = direction === 'undo' ? toneSession.peekUndo() : toneSession.peekRedo();
+  if (!target) return;
+  const applied = await restoreTone(target);
+  if (!applied) return;
+  if (direction === 'undo') toneSession.commitUndo(applied);
+  else toneSession.commitRedo(applied);
+  updateToneTools();
+}
+
+async function switchToneVariant(which) {
+  if (toneBusy || !state.preset || toneSession.active === which) return;
+  const previous = structuredClone(state.preset);
+  const target = toneSession.snapshot(which);
+  const applied = await restoreTone(target);
+  if (!applied) return;
+  toneSession.activate(which, previous, applied);
+  updateToneTools();
+}
+
+$('#tone-undo').addEventListener('click', () => replayTone('undo'));
+$('#tone-redo').addEventListener('click', () => replayTone('redo'));
+$('#tone-a').addEventListener('click', () => switchToneVariant('A'));
+$('#tone-b').addEventListener('click', () => switchToneVariant('B'));
+$('#tone-copy').addEventListener('click', () => {
+  if (toneBusy || !state.preset) return;
+  const other = toneSession.copyToOther(state.preset);
+  updateToneTools();
+  toast(`Copied tone ${toneSession.active} into ${other}; now select ${other} to compare.`);
+});
+
+// Keep native text-input Undo behaviour. Shortcuts apply only when focus is
+// outside editable controls and do not affect the hardware's saved presets.
+document.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.target.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+  const k = e.key.toLowerCase();
+  if (k === 'z') {
+    if (toneSession.canUndo && !toneBusy && state.preset) {
+      e.preventDefault();
+      replayTone(e.shiftKey ? 'redo' : 'undo');
+    } else if (e.shiftKey && toneSession.canRedo && !toneBusy) {
+      e.preventDefault();
+      replayTone('redo');
+    }
+  } else if (k === 'y' && toneSession.canRedo && !toneBusy) {
+    e.preventDefault();
+    replayTone('redo');
+  }
+});
+
 function renderPreset() {
   const p = state.preset;
   renderPresetHeader();
@@ -664,6 +720,7 @@ function renderPreset() {
   $('#export-current').disabled = !p;
   rig.render();
   renderLibrary();
+  updateToneTools();
 }
 
 function renderPresetHeader() {
