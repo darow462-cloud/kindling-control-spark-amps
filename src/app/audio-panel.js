@@ -280,9 +280,13 @@ export function initAudioPanel(root = document.getElementById('panel-analysis'))
     const scale = Math.min(window.devicePixelRatio || 1, 2);
     const cssWidth = Math.max(320, canvas.clientWidth || 760);
     const cssHeight = cssWidth < 540 ? 265 : 330;
-    canvas.width = Math.round(cssWidth * scale);
-    canvas.height = Math.round(cssHeight * scale);
-    context.scale(scale, scale);
+    const canvasWidth = Math.round(cssWidth * scale);
+    const canvasHeight = Math.round(cssHeight * scale);
+    // Avoid repeatedly changing intrinsic canvas dimensions from within
+    // ResizeObserver: that can cause another resize notification.
+    if (canvas.width !== canvasWidth) canvas.width = canvasWidth;
+    if (canvas.height !== canvasHeight) canvas.height = canvasHeight;
+    context.setTransform(scale, 0, 0, scale, 0, 0);
     const w = cssWidth, h = cssHeight;
     const margin = { left: 46, right: 18, top: 19, bottom: 34 };
     const x0 = margin.left, y0 = margin.top;
