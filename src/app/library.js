@@ -1,15 +1,26 @@
-// "My presets": presets saved on this device, independent of the amp's
-// hardware slots. Stored in localStorage as Ignitron-compatible preset JSON,
-// so the same objects can be exported and imported as files.
-//
-// Storage can be unavailable (private windows, blocked site data); every
-// access is guarded and the library then works in memory for the session.
+// "My presets" are stored separately from the amp's hardware banks.
+// The existing v1 localStorage key and Ignitron-compatible preset JSON are
+// unchanged; organizer metadata lives alongside the preset, never in BLE data.
 
 import { presetToJson, presetFromJson } from '../spark/messages.js';
 
 const KEY = 'kindling-control.presets.v1';
-// Earlier versions of the app (as "Spark Control") stored presets here; migrated on first load.
 const LEGACY_KEYS = ['spark-control.presets.v1'];
+
+const text = (value, max = 80) => typeof value === 'string' ? value.trim().slice(0, max) : '';
+
+export function normalizePresetMeta(value = {}) {
+  const m = value && typeof value === 'object' ? value : {};
+  const rawTags = Array.isArray(m.tags) ? m.tags : (typeof m.tags === 'string' ? m.tags.split(',') : []);
+  const tags = [...new Set(rawTags.map((tag) => text(tag, 32)).filter(Boolean))].slice(0, 12);
+  return {
+    artist: text(m.artist),
+    song: text(m.song),
+    tags,
+    favorite: m.favorite === true,
+    guitarProfileId: text(m.guitarProfileId, 80),
+  };
+}
 
 export class PresetLibrary extends EventTarget {
   constructor(storage = safeStorage()) {
@@ -18,26 +29,62 @@ export class PresetLibrary extends EventTarget {
     this.items = this._load();
   }
 
-  /** All presets, most recently saved first. */
+  /** Most-recently-saved first; each item has a copy of its organizer metadata. */
   list() {
-    return [...this.items].sort((a, b) => (b.savedAt ?? 0) - (a.savedAt ?? 0)).map((i) => ({ ...presetFromJson(i.json), savedAt: i.savedAt }));
+    return [...this.items]
+      .sort((a, b) => (b.savedAt ?? 0) - (a.savedAt ?? 0))
+      .map((i) => ({
+        ...presetFromJson(i.json),
+        savedAt: i.savedAt,
+        metadata: normalizePresetMeta(i.metadata),
+      }));
   }
 
+  /** Return only a Spark-compatible preset. Organizer data never reaches BLE. */
   get(uuid) {
-    const i = this.items.find((x) => x.json.UUID === uuid);
-    return i ? presetFromJson(i.json) : null;
+    const entry = this.items.find((x) => x.json.UUID === uuid);
+    return entry ? presetFromJson(entry.json) : null;
   }
 
-  /** Add or replace (by UUID). */
-  save(preset) {
+  metadata(uuid) {
+    const entry = this.items.find((x) => x.json.UUID === uuid);
+    return entry ? normalizePresetMeta(entry.metadata) : null;
+  }
+
+  /** Add/replace a tone while retaining its metadata unless explicitly supplied. */
+  save(preset, metadata = undefined) {
     if (!preset.uuid) throw new Error('preset needs a uuid');
     const json = presetToJson({ ...preset, slot: null });
     delete json.PresetNumber;
-    const entry = { json, savedAt: Date.now() };
     const i = this.items.findIndex((x) => x.json.UUID === preset.uuid);
+    const old = i >= 0 ? this.items[i] : null;
+    const entry = {
+      json,
+      savedAt: Date.now(),
+      metadata: normalizePresetMeta(metadata === undefined ? old?.metadata : metadata),
+    };
     if (i >= 0) this.items[i] = entry;
     else this.items.push(entry);
     this._persist();
+  }
+
+  updateMetadata(uuid, patch) {
+    const item = this.items.find((x) => x.json.UUID === uuid);
+    if (!item) return false;
+    item.metadata = normalizePresetMeta({ ...normalizePresetMeta(item.metadata), ...patch });
+    this._persist();
+    return true;
+  }
+
+  /** Remove dangling guitar associations when a guitar profile is deleted. */
+  unlinkGuitarProfile(profileId) {
+    let changed = false;
+    for (const item of this.items) {
+      if (item.metadata?.guitarProfileId !== profileId) continue;
+      item.metadata = normalizePresetMeta({ ...item.metadata, guitarProfileId: '' });
+      changed = true;
+    }
+    if (changed) this._persist();
   }
 
   remove(uuid) {
@@ -54,7 +101,10 @@ export class PresetLibrary extends EventTarget {
       this._migrateLegacy();
       const raw = this.storage?.getItem(KEY);
       const arr = raw ? JSON.parse(raw) : [];
-      return Array.isArray(arr) ? arr.filter((x) => x?.json?.UUID && Array.isArray(x.json.Pedals)) : [];
+      return Array.isArray(arr)
+        ? arr.filter((x) => x?.json?.UUID && Array.isArray(x.json.Pedals))
+          .map((x) => ({ ...x, metadata: normalizePresetMeta(x.metadata) }))
+        : [];
     } catch {
       return [];
     }
@@ -75,7 +125,7 @@ export class PresetLibrary extends EventTarget {
     try {
       this.storage?.setItem(KEY, JSON.stringify(this.items));
     } catch {
-      // quota exceeded or storage blocked: keep working in memory
+      // storage is blocked or full; keep working in memory
     }
     this.dispatchEvent(new Event('change'));
   }
