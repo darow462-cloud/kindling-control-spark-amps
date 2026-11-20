@@ -242,7 +242,7 @@ function wireClient(c) {
   });
   c.addEventListener('presetSelected', (e) => {
     // Internal A/B and Undo operations select the temporary slot.
-    if (e.detail.solicited || (toneBusy && e.detail.slot === TEMP_SLOT)) return;
+    if (e.detail.solicited || e.detail.slot === TEMP_SLOT) return;
     state.slot = e.detail.slot;
     state.unsaved = false; // the amp moved on; the unsaved tone is gone
     highlightSlot();
@@ -699,17 +699,15 @@ $('#tone-copy').addEventListener('click', () => {
 document.addEventListener('keydown', (e) => {
   if (!(e.ctrlKey || e.metaKey) || e.altKey || e.target.closest?.('input, textarea, select, [contenteditable="true"]')) return;
   const k = e.key.toLowerCase();
-  if (k === 'z') {
-    if (toneSession.canUndo && !toneBusy && state.preset) {
-      e.preventDefault();
-      replayTone(e.shiftKey ? 'redo' : 'undo');
-    } else if (e.shiftKey && toneSession.canRedo && !toneBusy) {
-      e.preventDefault();
-      replayTone('redo');
-    }
-  } else if (k === 'y' && toneSession.canRedo && !toneBusy) {
+  if (toneBusy || !state.preset) return;
+  const redo = k === 'y' || (k === 'z' && e.shiftKey);
+  const undo = k === 'z' && !e.shiftKey;
+  if (redo && toneSession.canRedo) {
     e.preventDefault();
     replayTone('redo');
+  } else if (undo && toneSession.canUndo) {
+    e.preventDefault();
+    replayTone('undo');
   }
 });
 
