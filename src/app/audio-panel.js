@@ -339,7 +339,13 @@ export function initAudioPanel(root = document.getElementById('panel-analysis'))
       if (file) loadTrack(file, role);
     });
     $('analysis-' + role + '-position').addEventListener('input', () => positionLabel(role));
-    $('analysis-' + role + '-position').addEventListener('change', () => analyzeTrack(role));
+    $('analysis-' + role + '-position').addEventListener('change', () => {
+      const start = Number($('analysis-' + role + '-position').value) || 0;
+      const player = $('analysis-' + role + '-player');
+      // Keep the audible excerpt aligned with the section shown in the plot.
+      try { player.currentTime = start; } catch { /* metadata may not be ready */ }
+      analyzeTrack(role);
+    });
   }
   $('analysis-mic-refresh').addEventListener('click', () => refreshInputs());
   $('analysis-record-start').addEventListener('click', startRecording);
