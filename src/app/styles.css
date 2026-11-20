@@ -515,6 +515,13 @@ main { padding: 1rem max(1rem, env(safe-area-inset-right)) 1rem max(1rem, env(sa
 .knob-chicken .knob-cap { fill: #2c2c2c; stroke: #000; stroke-width: 1; }
 .knob-chicken .knob-pointer { stroke: #f5f1e6; stroke-width: 3.5; }
 .knob-chicken .knob-value { color: #3a362f; }
+.knob-chicken .knob-value-input {
+  color: #1f1d19; background: rgb(255 255 255 / 0.66);
+  border-color: rgb(0 0 0 / 0.18);
+}
+.knob-chicken .knob-value-input:hover, .knob-chicken .knob-value-input:focus-visible {
+  color: #1f1d19; background: #fff4d9; border-color: #b45309;
+}
 
 .toggle-ctl, .selector-ctl { display: grid; justify-items: center; gap: 0.3rem; inline-size: 4.4rem; }
 .selector-ctl { inline-size: auto; min-inline-size: 7rem; }
