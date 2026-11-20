@@ -1,9 +1,9 @@
-name: KindlingControl 0.3 Windows Portable (test build)
+name: KindlingControl 0.3 Fast Windows Portable (test build)
 
 on:
   push:
     branches:
-      - feature/v0.3-editor-ab-history
+      - fix/v0.3-fast-ab-undo
     paths:
       - ".github/workflows/spark2-portable.yml"
       - "src/**"
@@ -31,17 +31,17 @@ jobs:
       - name: Run tests
         run: npm test
       - name: Stamp development build version
-        run: node tools/stamp-version.js 0.3.0-editor.1
+        run: node tools/stamp-version.js 0.3.1-fast.1
       - name: Build portable Windows exe
         shell: pwsh
         run: >
           npx electron-builder --win portable --x64 --publish never
-          --config.extraMetadata.version=0.3.0-editor.1
-          --config.productName="KindlingControl Editor 0.3 Test"
-          --config.appId=dev.bluedog.kindlingcontrol.editor03
+          --config.extraMetadata.version=0.3.1-fast.1
+          --config.productName="KindlingControl Editor 0.3 Fast Test"
+          --config.appId=dev.bluedog.kindlingcontrol.editor03fast
       - uses: actions/upload-artifact@v4
         with:
-          name: KindlingControl-Editor03-Portable-Win-x64
+          name: KindlingControl-Editor03-Fast-Portable-Win-x64
           path: dist/*.exe
           if-no-files-found: error
           retention-days: 14
