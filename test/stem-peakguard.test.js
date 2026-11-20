@@ -25,6 +25,23 @@ const makeWav = (samples) => {
 };
 const values = (b) => Array.from({ length: (b.length - 44) / 4 }, (_, i) => b.readFloatLE(44 + i * 4));
 
+// This is the exact WAVE_FORMAT_EXTENSIBLE + IEEE_FLOAT GUID layout used by
+// real 32-bit float stem exports (including the user's WAVEX drums.wav).
+const makeWavex = (samples) => {
+  const base = makeWav(samples);
+  const extended = Buffer.alloc(base.length + 24);
+  base.copy(extended, 0, 0, 36);
+  extended.writeUInt32LE(extended.length - 8, 4); // RIFF size
+  extended.writeUInt32LE(40, 16);                 // fmt chunk size
+  extended.writeUInt16LE(0xfffe, 20);             // WAVE_FORMAT_EXTENSIBLE
+  extended.writeUInt16LE(22, 36);                 // cbSize
+  extended.writeUInt16LE(32, 38);                 // valid bits
+  extended.writeUInt32LE(3, 40);                  // stereo speaker mask
+  Buffer.from('0300000000001000800000aa00389b71', 'hex').copy(extended, 44);
+  base.copy(extended, 60, 36);                    // data header + samples
+  return extended;
+};
+
 async function workspace() {
   const root = await mkdtemp(join(tmpdir(), 'kindling-peak-'));
   return { root, path: (i) => join(root, `${i}.wav`) };
@@ -111,5 +128,34 @@ test('unreasonable ceiling and non-WAV output are rejected rather than silently 
     await assert.rejects(applyGlobalPeakGuard([ws.path(1)], { ceilingDb: 0 }), RangeError);
     await writeFile(ws.path(2), Buffer.alloc(50, 0));
     await assert.rejects(applyGlobalPeakGuard([ws.path(2)]), /RIFF/);
+  } finally { await rm(ws.root, { recursive: true, force: true }); }
+});
+
+
+test('real 40-byte WAVEX IEEE float files are accepted and gain protected', async () => {
+  const ws = await workspace();
+  try {
+    const source = makeWavex([1.174, 0.4, -0.75, 0.25]);
+    await writeFile(ws.path(5), source);
+    const info = await readFloatWavInfo(ws.path(5));
+    assert.equal(info.dataOffset, 68);
+    assert.equal(info.frames, 2);
+    const result = await applyGlobalPeakGuard([ws.path(5)]);
+    assert.ok(Math.abs(result.peakAfterDb + 1) < 0.001);
+    const protectedFile = await readFile(ws.path(5));
+    const left = protectedFile.readFloatLE(68);
+    assert.ok(Math.abs(left - (10 ** (-1 / 20))) < 0.00001);
+    assert.deepEqual(protectedFile.subarray(0, 68), source.subarray(0, 68), 'WAVEX header must not be rewritten');
+  } finally { await rm(ws.root, { recursive: true, force: true }); }
+});
+
+test('a WAVEX header with the wrong subtype GUID is rejected before writing', async () => {
+  const ws = await workspace();
+  try {
+    const invalid = makeWavex([1.25, 0.4]);
+    invalid[44] = 0x01; // PCM integer subtype, not IEEE float
+    await writeFile(ws.path(6), invalid);
+    await assert.rejects(applyGlobalPeakGuard([ws.path(6)]), /float/);
+    assert.deepEqual(await readFile(ws.path(6)), invalid);
   } finally { await rm(ws.root, { recursive: true, force: true }); }
 });
