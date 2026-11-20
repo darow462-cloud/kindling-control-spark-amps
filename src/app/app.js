@@ -19,6 +19,7 @@ import {
 } from '../spark/index.js';
 import { PresetLibrary, normalizePresetMeta } from './library.js';
 import { GuitarProfileLibrary } from './guitar-profiles.js';
+import { filterOrganizedPresets } from './library-search.js';
 import { createRig } from './rig.js';
 import { ToneSession } from './tone-session.js';
 import { planToneDelta } from './tone-diff.js';
@@ -699,19 +700,12 @@ function renderLibrary() {
   setOptions(filterArtist, artists, 'All artists');
   renderGuitarOptions($('#library-guitar-filter'));
 
-  const query = $('#library-search').value.trim().toLocaleLowerCase();
-  const artist = filterArtist.value;
-  const guitarId = $('#library-guitar-filter').value;
-  const favoritesOnly = $('#library-favorites-only').checked;
-  const filtered = all.filter((p) => {
-    const meta = p.metadata;
-    if (artist && meta.artist !== artist) return false;
-    if (guitarId && meta.guitarProfileId !== guitarId) return false;
-    if (favoritesOnly && !meta.favorite) return false;
-    const guitar = state.guitars.get(meta.guitarProfileId);
-    const haystack = [p.name, p.description, meta.artist, meta.song, ...meta.tags, guitar?.name ?? ''].join(' ').toLocaleLowerCase();
-    return haystack.includes(query);
-  });
+  const filtered = filterOrganizedPresets(all, {
+    query: $('#library-search').value,
+    artist: filterArtist.value,
+    guitarId: $('#library-guitar-filter').value,
+    favoritesOnly: $('#library-favorites-only').checked,
+  }, state.guitars.list());
   $('#library-empty').hidden = all.length > 0;
   $('#library-storage-warning').hidden = state.library.persistent && state.guitars.persistent;
   $('#library-results').textContent = all.length ? `Showing ${filtered.length} of ${all.length} saved presets` : '';
