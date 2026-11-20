@@ -894,3 +894,20 @@ dialog.help-dialog[open] { display: flex; }
   .stem-track-list { grid-template-columns: 1fr; }
   .stem-pick button { inline-size: 100%; }
 }
+
+/* ---- 0.6.1: safe peak headroom and quality selector ------------------------ */
+.stem-settings { display: grid; gap: 0.5rem; margin-bottom: 0.5rem; }
+.stem-settings > label:not(.stem-headroom) { font-size: 0.83rem; font-weight: 700; color: var(--muted); }
+.stem-settings > select {
+  padding: 0.55rem 0.7rem; width: 100%; max-width: 620px;
+  color: var(--text); background: var(--bg-2);
+  border: 1px solid var(--border); border-radius: 0.55rem; font: inherit;
+}
+.stem-settings .stem-headroom {
+  display: flex; align-items: flex-start; gap: 0.5rem; margin-top: 0.3rem;
+  line-height: 1.4; max-width: 78ch; font-size: 0.88rem;
+}
+.stem-settings .stem-headroom input {
+  margin-top: 0.15rem; flex-shrink: 0; accent-color: var(--accent);
+}
+.stem-settings .hint { font-size: 0.8rem; color: var(--muted); max-width: 80ch; margin: 0 0 0.25rem; }

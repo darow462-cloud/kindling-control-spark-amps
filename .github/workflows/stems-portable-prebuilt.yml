@@ -1,9 +1,9 @@
-name: KindlingControl 0.6 Stems Portable (upstream verified CLI)
+name: KindlingControl 0.6.1 HQ Stems Portable (upstream verified CLI)
 
 on:
   push:
     branches:
-      - feature/v0.6-local-stem-separation
+      - feature/v0.6.1-hq-stems-peakguard
     paths:
       - ".github/workflows/stems-portable-prebuilt.yml"
       - "desktop/**"
@@ -46,6 +46,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node --check desktop/stem-service.js
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check desktop/stem-peakguard.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node --check src/app/stem-panel.js
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node --check src/app/audio-panel.js
@@ -78,7 +80,7 @@ jobs:
           Invoke-WebRequest -Uri "https://raw.githubusercontent.com/nikhilunni/demucs-rs/805d6f72ede20282832ac78c634e8767716c0b21/LICENSE" -OutFile build/bin/LICENSE.txt
           node tools/make-stem-builder-config.js
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          node tools/stamp-version.js 0.6.0-stems.1
+          node tools/stamp-version.js 0.6.1-quality.1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build native-stems Windows Portable
@@ -86,13 +88,13 @@ jobs:
         run: >
           npx electron-builder --config build/stem-electron-builder.json
           --win portable --x64 --publish never
-          --config.extraMetadata.version=0.6.0-stems.1
-          --config.productName="KindlingControl Six Stems 0.6 Test"
-          --config.appId=dev.darow462.kindlingcontrol.stems06
+          --config.extraMetadata.version=0.6.1-quality.1
+          --config.productName="KindlingControl HQ Stems 0.6.1 Test"
+          --config.appId=dev.darow462.kindlingcontrol.stems061
 
       - uses: actions/upload-artifact@v4
         with:
-          name: KindlingControl-Stems06-Prebuilt-Win-x64
+          name: KindlingControl-Stems061-HQ-Win-x64
           path: dist/*.exe
           if-no-files-found: error
           retention-days: 14

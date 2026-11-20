@@ -11,6 +11,10 @@ The Windows-only experimental **Stems** tab uses the native Rust [demucs-rs](htt
 - `piano.wav`
 - `other.wav`
 
+The <strong>Standard</strong> path uses six-stem HTDemucs. Experimental <strong>High Quality</strong> runs the same model plus `htdemucs_ft` sequentially, then uses fine-tuned drums/bass/vocals and six-stem guitar/piano/other. No model result is subtracted from another to synthesize a residual track. The extra model is ~333 MB and inference is substantially slower. No quality improvement is guaranteed; compare the output with your source audio on the target machine.
+
+`desktop/stem-peakguard.js` supports an optional, default-enabled global peak scan for all six output WAVs. If the highest sample exceeds −1 dBFS, all six stems receive **the same constant gain**; this prevents clipping on ordinary playback without any per-track normalization, compressor, limiter or gain pumping. It does **not** repair artifacts that the model already generated, including temporal instability or crackle. Because it is a sample-peak rather than true-peak measurement, downstream encoding can still produce intersample overs.
+
 The original mix is not split into distinct players or individual guitar overdubs. Distorted guitars, bass, keyboards and cymbals overlap spectrally, so source leakage is expected. This is primarily a listening/practice aid and a source for the existing Analyze tab. It is not a clean multitrack reconstruction of the original recording.
 
 ## Build provenance and licenses
@@ -40,6 +44,7 @@ The official source-release workflow completed its Windows CLI build successfull
 ## Known limitations
 
 - A GPU/driver supporting Vulkan and enough RAM/VRAM are needed. Native inference may fail with unsupported or insufficient GPU resources. The app reports the native error and does not silently substitute a spectrum/EQ filter.
+- High Quality uses two separate complete model passes. It does not use a sample-perfect phase-aligned multitrack mixer, and may have model-to-model stem bleed. The 333 MB fine-tuned model is in addition to the 84 MB six-stem model.
 - The first inference can take longer due to weight download and GPU shader compilation. The progress status is text-based; the app does **not** claim a precise percentage.
 - Long songs create large stereo WAV files. Input files are limited to 350 MB; loading the generated guitar stem into Analyze has an independent 180 MB limit to protect memory.
 - The interface has **separate audio players** for each stem; it does not yet offer sample-accurate synchronized six-track mixing or editing. A DAW can align the WAV files from the same run.
