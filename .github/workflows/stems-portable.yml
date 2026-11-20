@@ -1,0 +1,99 @@
+name: KindlingControl 0.6 Six Stems Windows Portable (experimental)
+
+# Manual fallback when the upstream v0.3.5 artifact has expired.
+# Source compilation is expensive; routine pushes use the verified prebuilt.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-stems-portable:
+    name: Build native Windows 6-stem Portable
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Test app, Spark protocol and native stem integration
+        run: npm test
+
+      - name: Check renderer and desktop JavaScript syntax
+        shell: pwsh
+        run: |
+          node --check desktop/main.js
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          node --check desktop/preload.cjs
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          node --check desktop/stem-service.js
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          node --check src/app/app.js
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          node --check src/app/stem-panel.js
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          node --check src/app/audio-panel.js
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Clone exact demucs-rs v0.3.5 source revision
+        shell: pwsh
+        run: |
+          git clone --depth 1 --branch v0.3.5 https://github.com/nikhilunni/demucs-rs.git demucs-rs
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $commit = (git -C demucs-rs rev-parse HEAD).Trim()
+          if ($commit -ne "805d6f72ede20282832ac78c634e8767716c0b21") {
+            throw "demucs-rs revision mismatch: $commit"
+          }
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: demucs-rs -> target
+          key: demucs-rs-v0.3.5-win-x64
+
+      # demucs-rs upstream's Windows release build requires the Vulkan SDK.
+      - name: Install Vulkan SDK (matching upstream Windows release)
+        uses: humbletim/install-vulkan-sdk@v1.2
+
+      - name: Compile pinned six-stem native engine (Vulkan / wgpu)
+        shell: pwsh
+        working-directory: demucs-rs
+        run: |
+          cargo build --release --locked -p demucs-cli --jobs 2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Package native engine and its license
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path build/bin | Out-Null
+          Copy-Item demucs-rs/target/release/demucs.exe build/bin/demucs.exe -ErrorAction Stop
+          Copy-Item demucs-rs/LICENSE build/bin/LICENSE.txt -ErrorAction Stop
+          node tools/make-stem-builder-config.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node tools/stamp-version.js 0.6.0-stems.1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build standalone Windows Portable with native stem separation
+        shell: pwsh
+        run: >
+          npx electron-builder --config build/stem-electron-builder.json
+          --win portable --x64 --publish never
+          --config.extraMetadata.version=0.6.0-stems.1
+          --config.productName="KindlingControl Six Stems 0.6 Test"
+          --config.appId=dev.darow462.kindlingcontrol.stems06
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KindlingControl-Stems06-Portable-Win-x64
+          path: dist/*.exe
+          if-no-files-found: error
+          retention-days: 14

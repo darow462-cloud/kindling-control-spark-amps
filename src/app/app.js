@@ -24,6 +24,7 @@ import { exportLibraryBackup, planLibraryBackupImport, applyLibraryBackupPlan } 
 import { createRig } from './rig.js';
 import { ToneSession } from './tone-session.js';
 import { initAudioPanel } from './audio-panel.js';
+import { initStemPanel } from './stem-panel.js';
 import { planToneDelta } from './tone-diff.js';
 import { createReporter, detectApp, scrubLog } from './telemetry.js';
 import { VERSION } from '../version.js';
@@ -1360,8 +1361,16 @@ tabs.forEach((t, i) => {
   });
 });
 
-// Independent, local audio-analysis tab; does not access the Spark transport.
-initAudioPanel();
+// Local audio analysis and native stem separation remain independent of the
+// Spark transport. A completed guitar stem may be loaded as a reference.
+const audioPanel = initAudioPanel();
+initStemPanel({
+  onAnalyzeGuitar: async (stem) => {
+    if (!audioPanel) throw new Error('Audio analysis is unavailable in this build.');
+    await audioPanel.loadSeparatedGuitar(stem);
+    selectTab($('#tab-analysis'));
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Electron: Chromium has no built-in Bluetooth chooser there, so the main

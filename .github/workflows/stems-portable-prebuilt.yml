@@ -1,0 +1,98 @@
+name: KindlingControl 0.6 Stems Portable (upstream verified CLI)
+
+on:
+  push:
+    branches:
+      - feature/v0.6-local-stem-separation
+    paths:
+      - ".github/workflows/stems-portable-prebuilt.yml"
+      - "desktop/**"
+      - "src/**"
+      - "test/**"
+      - "tools/make-stem-builder-config.js"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  package-prebuilt:
+    name: Package SHA-verified upstream Windows demucs.exe
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install and run KindlingControl tests
+        shell: pwsh
+        run: |
+          npm ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Validate Electron sources
+        shell: pwsh
+        run: |
+          node --check desktop/main.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check desktop/preload.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check desktop/stem-service.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check src/app/stem-panel.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check src/app/audio-panel.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # This artifact was compiled by demucs-rs upstream's own Windows release
+      # workflow for tag v0.3.5 at SHA 805d6f72ede20282832ac78c634e8767716c0b21.
+      # Pin both the run and the executable content hash.
+      - name: Download upstream Windows CLI from its official release run
+        uses: actions/download-artifact@v4
+        with:
+          repository: nikhilunni/demucs-rs
+          run-id: 39365873521
+          name: demucs-x86_64-pc-windows-msvc
+          github-token: ${{ github.token }}
+          path: build/upstream
+
+      - name: Validate native engine and include its license
+        shell: pwsh
+        run: |
+          Expand-Archive build/upstream/demucs-x86_64-pc-windows-msvc.zip -DestinationPath build/upstream/extracted
+          $exe = "build/upstream/extracted/demucs.exe"
+          if (!(Test-Path $exe)) { throw "Upstream native demucs.exe is missing" }
+          $hash = (Get-FileHash -Algorithm SHA256 $exe).Hash.ToLowerInvariant()
+          if ($hash -ne "ec32ec6f00c9677bbed44a91fad453a9abf65a1dea520be0d32959a8ed937b02") {
+            throw "Native demucs.exe SHA256 mismatch: $hash"
+          }
+          New-Item -ItemType Directory -Force -Path build/bin | Out-Null
+          Copy-Item $exe build/bin/demucs.exe
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/nikhilunni/demucs-rs/805d6f72ede20282832ac78c634e8767716c0b21/LICENSE" -OutFile build/bin/LICENSE.txt
+          node tools/make-stem-builder-config.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node tools/stamp-version.js 0.6.0-stems.1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build native-stems Windows Portable
+        shell: pwsh
+        run: >
+          npx electron-builder --config build/stem-electron-builder.json
+          --win portable --x64 --publish never
+          --config.extraMetadata.version=0.6.0-stems.1
+          --config.productName="KindlingControl Six Stems 0.6 Test"
+          --config.appId=dev.darow462.kindlingcontrol.stems06
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KindlingControl-Stems06-Prebuilt-Win-x64
+          path: dist/*.exe
+          if-no-files-found: error
+          retention-days: 14

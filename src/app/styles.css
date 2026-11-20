@@ -844,3 +844,53 @@ dialog.help-dialog[open] { display: flex; }
   .analysis-sources { grid-template-columns: 1fr; }
   .analysis-metrics { grid-template-columns: 1fr; }
 }
+
+/* ---- native Windows HTDemucs stem separation (0.6 experimental) ---------- */
+#panel-stems { max-inline-size: 1080px; margin: 0 auto; }
+#panel-stems > h2 { font-size: 1.25rem; margin: 0 0 0.65rem; }
+#panel-stems > p { max-inline-size: 83ch; color: var(--muted); }
+.stem-notice {
+  border: 1px solid var(--border); border-radius: 0.7rem;
+  padding: 0.65rem 0.9rem; margin-bottom: 1rem;
+  background: var(--surface); color: var(--muted);
+  font-size: 0.85rem; line-height: 1.5;
+}
+.stem-notice p { margin: 0.35rem 0; }
+.stem-notice strong { color: var(--text); }
+.stem-form {
+  display: grid; gap: 0.75rem; padding: 1rem;
+  border: 1px solid var(--border); background: var(--surface);
+  border-radius: 0.85rem;
+}
+.stem-pick { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+.stem-pick button { flex: none; }
+.stem-file-label {
+  overflow-wrap: anywhere; min-width: 0;
+  color: var(--muted); font-size: 0.85rem;
+}
+.stem-actions { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; }
+#stem-progress { inline-size: 100%; max-inline-size: 480px; block-size: 0.75rem; accent-color: var(--accent); }
+#stem-progress[hidden] { display: none; }
+.stem-status { color: var(--muted); margin: 0; font-size: 0.88rem; overflow-wrap: anywhere; }
+.stem-status[data-kind="success"] { color: var(--ok); }
+.stem-status[data-kind="error"] { color: #fca5a5; }
+#stem-results { margin-top: 1.5rem; }
+#stem-results[hidden] { display: none; }
+#stem-results h3 { font-size: 1rem; }
+#stem-results .hint { color: var(--muted); font-size: 0.85rem; }
+.stem-track-list {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem; margin: 0.85rem 0 1.1rem;
+}
+.stem-track {
+  display: grid; min-width: 0; gap: 0.45rem; padding: 0.75rem;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 0.7rem;
+}
+.stem-track-title { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; font-size: 0.86rem; }
+.stem-track-title span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.stem-track audio { inline-size: 100%; min-width: 0; }
+@media (max-width: 740px) {
+  .stem-track-list { grid-template-columns: 1fr; }
+  .stem-pick button { inline-size: 100%; }
+}
