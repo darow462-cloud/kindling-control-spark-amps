@@ -20,6 +20,7 @@ import {
 import { PresetLibrary, normalizePresetMeta } from './library.js';
 import { GuitarProfileLibrary } from './guitar-profiles.js';
 import { filterOrganizedPresets } from './library-search.js';
+import { exportLibraryBackup, planLibraryBackupImport, applyLibraryBackupPlan } from './library-backup.js';
 import { createRig } from './rig.js';
 import { ToneSession } from './tone-session.js';
 import { planToneDelta } from './tone-diff.js';
@@ -489,6 +490,14 @@ $('#save-preset').addEventListener('click', () => {
   $('#save-name').value = state.preset.name || '';
   $('#save-desc').value = state.preset.description || '';
   $('#save-library').checked = true;
+  const meta = state.library.metadata(state.preset.uuid) ?? normalizePresetMeta();
+  $('#save-artist').value = meta.artist;
+  $('#save-song').value = meta.song;
+  $('#save-tags').value = meta.tags.join(', ');
+  $('#save-favorite').checked = meta.favorite;
+  renderGuitarOptions($('#save-guitar'));
+  $('#save-guitar').value = state.guitars.get(meta.guitarProfileId) ? meta.guitarProfileId : '';
+  $('#save-organizer').open = !!(meta.artist || meta.song || meta.tags.length || meta.favorite || meta.guitarProfileId);
   const sel = $('#save-slot');
   sel.replaceChildren(new Option("Don't store on the amp", ''));
   if (state.connected) {
@@ -523,7 +532,15 @@ $('#save-dialog').addEventListener('close', async () => {
       description: $('#save-desc').value.trim(),
       uuid: state.preset.uuid || tone.uuid || randomUuid(),
     };
-    if (toLibrary) state.library.save(preset);
+    if (toLibrary) {
+      state.library.save(preset, {
+        artist: $('#save-artist').value,
+        song: $('#save-song').value,
+        tags: $('#save-tags').value,
+        favorite: $('#save-favorite').checked,
+        guitarProfileId: $('#save-guitar').value,
+      });
+    }
     if (slotValue !== '') {
       const slot = Number(slotValue);
       await state.client.storePreset(preset, slot);
@@ -558,7 +575,7 @@ function setOptions(select, entries, first) {
 
 function renderGuitarOptions(select) {
   const items = state.guitars.list().map((p) => ({ label: p.name, value: p.id }));
-  setOptions(select, items, select.id === 'organize-guitar' ? 'Not assigned' : 'All guitars');
+  setOptions(select, items, ['organize-guitar', 'save-guitar'].includes(select.id) ? 'Not assigned' : 'All guitars');
 }
 
 function openPresetOrganizer(uuid) {
