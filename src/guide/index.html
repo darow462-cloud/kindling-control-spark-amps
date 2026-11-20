@@ -47,6 +47,7 @@
         <li><a href="#reorder">Reordering the chain (experimental)</a></li>
         <li><a href="#tuner">Tuner</a></li>
         <li><a href="#console">Console</a></li>
+        <li><a href="#analysis">Analyze guitar tone (experimental)</a></li>
         <li><a href="#capture">Capture</a></li>
         <li><a href="#troubleshooting">Troubleshooting</a></li>
         <li><a href="#settings">Settings and About</a></li>
@@ -285,6 +286,19 @@
       </section>
 
       <!-- ------------------------------------------------------------------ -->
+      <section id="analysis">
+        <h2>Analyze guitar tone (experimental)</h2>
+        <p>The <strong>Analyze</strong> tab is an optional, entirely local tool for comparing a reference riff with your guitar track. It does not modify the amp, presets or Bluetooth connection, and cannot determine exact settings from a recording.</p>
+        <ol>
+          <li>Load a reference audio file (WAV, MP3 or other audio supported by Chromium). Prefer an isolated guitar recording rather than a complete song containing drums, bass and a mastered mix.</li>
+          <li>Load your own guitar recording, or choose a microphone / audio interface and press <strong>Record guitar</strong>. Recording requires microphone permission, is never automatic, and stops at 30 seconds. The app asks the system for the unprocessed input, but device drivers may still add processing.</li>
+          <li>Use each position slider to select the same eight-second musical passage in both tracks. The plotted spectrum shows the frequency distribution relative to each track's own strongest frequency; absolute recording volume is shown separately in RMS and peak dBFS.</li>
+          <li>Compare the six ranges (sub, bass, low mids, mids, presence and air) and listen. The guidance helps you decide whether to check Bass, Middle, Treble, pickup Voice or compression, but is not an automatic preset or an isolated-guitar detector.</li>
+        </ol>
+        <p><strong>Privacy:</strong> imported audio, recordings and computed data remain in memory on your device. They are never uploaded or saved to a preset. Closing the app clears the audio. Use headphones to avoid microphone feedback. If the recording device is unavailable, you can record in another application and import its file.</p>
+        <p class="note">File import has a 40 MB size limit. Your decoder's supported formats depend on the installed Chromium/operating system; WAV and MP3 are the most broadly compatible. No automatic guitar-source separation is performed.</p>
+      </section>
+
       <section id="capture">
         <h2>Capture</h2>
         <p>
