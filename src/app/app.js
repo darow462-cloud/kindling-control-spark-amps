@@ -23,6 +23,7 @@ import { filterOrganizedPresets } from './library-search.js';
 import { exportLibraryBackup, planLibraryBackupImport, applyLibraryBackupPlan } from './library-backup.js';
 import { createRig } from './rig.js';
 import { ToneSession } from './tone-session.js';
+import { initAudioPanel } from './audio-panel.js';
 import { planToneDelta } from './tone-diff.js';
 import { createReporter, detectApp, scrubLog } from './telemetry.js';
 import { VERSION } from '../version.js';
@@ -1358,6 +1359,9 @@ tabs.forEach((t, i) => {
     next.focus();
   });
 });
+
+// Independent, local audio-analysis tab; does not access the Spark transport.
+initAudioPanel();
 
 // ---------------------------------------------------------------------------
 // Electron: Chromium has no built-in Bluetooth chooser there, so the main
