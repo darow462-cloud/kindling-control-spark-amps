@@ -49,11 +49,14 @@ export class StemSeparationService {
     this.onEvent = onEvent;
     this.spawnProcess = spawnProcess;
     this.active = null;
+    this.starting = false;
     this.completed = null;
   }
 
   async start({ inputPath, outputRoot }) {
-    if (this.active) throw new Error('A separation is already running');
+    if (this.active || this.starting) throw new Error('A separation is already running');
+    this.starting = true;
+    try {
     const command = buildStemCommand(inputPath, outputRoot);
     const input = await stat(inputPath);
     if (!input.isFile() || input.size === 0 || input.size > MAX_STEM_INPUT_BYTES) {
@@ -127,6 +130,9 @@ export class StemSeparationService {
     child.once('error', (err) => { void finish(err); });
     child.once('close', (code) => { void finish(null, code); });
     return { id, outputDir };
+    } finally {
+      this.starting = false;
+    }
   }
 
   cancel() {
