@@ -317,7 +317,11 @@ function refreshPreset() {
   return refreshing;
 }
 
-$('#refresh').addEventListener('click', refreshPreset);
+$('#refresh').addEventListener('click', async () => {
+  if (toneBusy) return;
+  await flushToneWrites();
+  await refreshPreset();
+});
 
 for (const b of $$('.banks button')) {
   // Switching bank selects the preset in the same position in the new bank
@@ -423,6 +427,7 @@ $('#new-dialog').addEventListener('close', async () => {
   const name = $('#new-name').value.trim() || 'New preset';
   const from = $('input[name="new-from"]:checked').value;
   try {
+    await flushToneWrites();
     const base = from === 'current' && state.preset ? await liveTone() : blankPreset(name);
     const preset = { ...base, name, uuid: randomUuid(), description: from === 'current' ? base.description : '' };
     await makeLive(preset);
@@ -473,6 +478,7 @@ $('#save-dialog').addEventListener('close', async () => {
   const slotValue = $('#save-slot').value;
   if (!toLibrary && slotValue === '') return;
   try {
+    await flushToneWrites();
     const tone = await liveTone();
     const preset = {
       ...tone,
@@ -570,7 +576,8 @@ $('#import').addEventListener('change', async (e) => {
 });
 
 $('#export-current').addEventListener('click', async () => {
-  if (!state.preset) return;
+  if (!state.preset || toneBusy) return;
+  await flushToneWrites();
   download(state.preset.name, presetToJson(await liveTone()));
 });
 
