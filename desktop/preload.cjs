@@ -6,4 +6,18 @@ contextBridge.exposeInMainWorld('kindlingDesktop', {
   platform: process.platform,
   onBluetoothDevices: (cb) => ipcRenderer.on('bt:devices', (_e, devices) => cb(devices)),
   selectBluetoothDevice: (id) => ipcRenderer.send('bt:select', id),
+  stems: {
+    supported: process.platform === 'win32',
+    chooseInput: () => ipcRenderer.invoke('stem:choose-input'),
+    chooseOutput: () => ipcRenderer.invoke('stem:choose-output'),
+    start: () => ipcRenderer.invoke('stem:start'),
+    cancel: () => ipcRenderer.invoke('stem:cancel'),
+    openOutput: () => ipcRenderer.invoke('stem:open-output'),
+    onEvent: (callback) => {
+      if (typeof callback !== 'function') return () => {};
+      const listener = (_event, payload) => callback(payload);
+      ipcRenderer.on('stem:event', listener);
+      return () => ipcRenderer.removeListener('stem:event', listener);
+    },
+  },
 });
