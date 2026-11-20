@@ -144,6 +144,11 @@ npm run release:android -- v0.3.0       # signed apk + aab in out/, built locall
 - `BASED_ON` in `effects.js` lists the real gear each model is modelled on. Only add well-established mappings. Never copy descriptive text from third-party guides.
 - Amp models missing from the catalog get the standard labels `AMP_PARAMS` (Gain, Treble, Middle, Bass, Volume). Other unknown effects get "Param N".
 
+**Local audio analysis (0.5, experimental):**
+- `src/app/audio-analysis.js` is pure JS and contains the 4096-point FFT/Hann-window spectral analyzer, per-band energy, level/crest factor and heuristics. It can run under Node tests without a DOM. Do not add a cloud analysis service or claim an exact recording/amp match from relative spectra.
+- `src/app/audio-panel.js` is the only browser UI/recording integration for the Analyze tab; it uses local File/Blob URLs, Web Audio decoding, optional MediaRecorder, and an explicit `getUserMedia` action. Recording defaults to unprocessed input (no echo cancellation, suppression or AGC), is capped at 30 seconds, and stops/cleans up capture tracks. Audio is held in memory only and never sent over Bluetooth or to telemetry. Files are limited to 40 MB and comparison windows default to eight seconds, adjustable independently for each track.
+- Analysis is distinct from Spark control and from saving presets. Never include copyrighted reference audio in the repository or upload audio on the user's behalf. Some unsupported devices may require importing a recorded file instead of using microphone capture.
+
 **Desktop security:**
 - Keep `contextIsolation: true`, `sandbox: true` and `nodeIntegration: false`.
 - The preload only exposes the Bluetooth picker bridge (`window.kindlingDesktop`).
