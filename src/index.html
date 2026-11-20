@@ -136,11 +136,24 @@
       <h2>AI track separation <small>(Windows · experimental)</small></h2>
       <p>Separate a song locally into <strong>drums, bass, vocals, guitar, piano and other instruments</strong> using HTDemucs 6-stem. Each result is saved as an individual WAV file that you can listen to or open in a DAW. No audio is sent to a cloud service.</p>
       <div class="stem-notice">
-        <p><strong>Before the first run:</strong> the separation engine downloads about 84 MB of model weights from Hugging Face, then caches them locally. You need an internet connection for that first download; subsequent separations can use the cached model. A Vulkan-capable GPU is recommended. Long songs can require considerable memory and processing time.</p>
+        <p><strong>Before the first run:</strong> Standard downloads about 84 MB of HTDemucs weights; High Quality also downloads approximately 333 MB of fine-tuned weights. Models are cached locally. Internet is needed only to fetch missing weights. A Vulkan-capable GPU is recommended.</p>
         <p><strong>Limitations:</strong> guitar separation is approximate. In dense metal mixes, overlapping guitars, cymbals, vocals and distorted bass may bleed into other tracks. The six outputs are instrument categories, not guaranteed individual musicians or overdubs.</p>
       </div>
       <div id="stem-support-warning" class="banner" hidden>Native stem separation is currently provided only in the dedicated Windows Portable build. This browser/mobile build can still import an already separated WAV file into Analyze.</div>
       <div class="stem-form">
+        <div class="stem-settings">
+          <label for="stem-quality">Separation quality</label>
+          <select id="stem-quality">
+            <option value="standard">Standard — 6 stems (faster)</option>
+            <option value="high-quality">High Quality — fine-tuned drums, bass and vocals (slower)</option>
+          </select>
+          <p class="hint" id="stem-quality-hint">Uses the existing 6-stem model for every track.</p>
+          <label class="stem-headroom">
+            <input type="checkbox" id="stem-protect-peaks" checked>
+            Prevent clipping (apply one fixed gain to all stems if needed; −1 dBFS ceiling)
+          </label>
+          <p class="hint">This prevents digital overload but does not remove artifacts already produced by the model. It never compresses or independently normalizes individual track segments.</p>
+        </div>
         <div class="stem-pick">
           <button type="button" id="stem-select-file">Choose song…</button>
           <span id="stem-file-label" class="stem-file-label">No audio file selected</span>
