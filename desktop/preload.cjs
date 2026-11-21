@@ -6,6 +6,10 @@ contextBridge.exposeInMainWorld('kindlingDesktop', {
   platform: process.platform,
   onBluetoothDevices: (cb) => ipcRenderer.on('bt:devices', (_e, devices) => cb(devices)),
   selectBluetoothDevice: (id) => ipcRenderer.send('bt:select', id),
+  roformer: {
+    // No arbitrary paths or commands: the host only opens pinned local assets.
+    openStudio: () => ipcRenderer.invoke('roformer:open'),
+  },
   stems: {
     supported: process.platform === 'win32',
     chooseInput: () => ipcRenderer.invoke('stem:choose-input'),

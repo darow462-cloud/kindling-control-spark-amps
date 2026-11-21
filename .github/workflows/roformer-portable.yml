@@ -1,0 +1,176 @@
+name: KindlingControl 0.7 RoFormer WebGPU Windows Portable
+
+on:
+  push:
+    branches:
+      - feature/v0.7-roformer-webgpu-studio
+    paths:
+      - '.github/workflows/roformer-portable.yml'
+      - 'desktop/**'
+      - 'src/**'
+      - 'test/**'
+      - 'tools/make-roformer-builder-config.js'
+      - 'tools/patch-demucs-normalization.py'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  webgpu-studio:
+    name: Build pinned BS-RoFormer WebGPU WASM studio
+    runs-on: ubuntu-latest
+    timeout-minutes: 80
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.99.0'
+          targets: wasm32-unknown-unknown
+      - name: Fetch exactly pinned MIT/Apache-2.0 Stemyla source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p third_party/stemyla
+          git -C third_party/stemyla init
+          git -C third_party/stemyla remote add origin https://github.com/lloydmeta/stemyla.git
+          git -C third_party/stemyla fetch --depth 1 origin b2a771808d36f9a8d2f333528805d0ee2c1040a8
+          git -C third_party/stemyla checkout --detach FETCH_HEAD
+          test "$(git -C third_party/stemyla rev-parse HEAD)" = b2a771808d36f9a8d2f333528805d0ee2c1040a8
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: third_party/stemyla -> target
+          key: stemyla-b2a7718-wasm
+      - name: Install pinned official Trunk bundler binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --silent --show-error \
+            -o /tmp/trunk.tgz \
+            https://github.com/trunk-rs/trunk/releases/download/v0.22.1/trunk-x86_64-unknown-linux-gnu.tar.gz
+          curl --fail --location --retry 3 --silent --show-error \
+            -o /tmp/trunk.tgz.sha256 \
+            https://github.com/trunk-rs/trunk/releases/download/v0.22.1/trunk-x86_64-unknown-linux-gnu.tar.gz.sha256
+          # Upstream publishes a raw 64-hex digest, not a sha256sum filename record.
+          expected=$(tr -d '[:space:]' < /tmp/trunk.tgz.sha256)
+          actual=$(sha256sum /tmp/trunk.tgz | cut -d ' ' -f1)
+          test "${#expected}" -eq 64
+          test "$actual" = "$expected"
+          mkdir -p /tmp/trunk-release
+          tar -xzf /tmp/trunk.tgz -C /tmp/trunk-release
+          trunk_bin=$(find /tmp/trunk-release -type f -name trunk -print -quit)
+          test -n "$trunk_bin"
+          install -m 755 "$trunk_bin" "$HOME/.cargo/bin/trunk"
+          trunk --version
+      - name: Build local RoFormer WASM and its three workers
+        working-directory: third_party/stemyla/app
+        shell: bash
+        run: trunk build --release --public-url ./
+      - name: Verify built app is complete and contains NO model weights
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s third_party/stemyla/app/dist/index.html
+          wasm_count=$(find third_party/stemyla/app/dist -name '*.wasm' -type f | wc -l)
+          test "$wasm_count" -ge 4
+          ! find third_party/stemyla/app/dist -type f \( -name '*.safetensors' -o -name '*.ckpt' -o -name '*.pth' \) | grep .
+          mkdir -p roformer-bundle/studio roformer-bundle/notices
+          cp -a third_party/stemyla/app/dist/. roformer-bundle/studio/
+          cp third_party/stemyla/LICENSE-APACHE roformer-bundle/notices/
+          cp third_party/stemyla/LICENSE-MIT roformer-bundle/notices/
+          cp third_party/stemyla/THIRD-PARTY.md roformer-bundle/notices/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: roformer-pinned-webgpu-assets
+          path: roformer-bundle/
+          retention-days: 14
+          if-no-files-found: error
+
+  windows-portable:
+    name: Package 0.6.2 normalized Demucs + RoFormer WebGPU
+    needs: webgpu-studio
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install and test KindlingControl
+        shell: pwsh
+        run: |
+          npm ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check desktop/main.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check desktop/roformer-studio.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check desktop/preload.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check src/app/stem-panel.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/download-artifact@v4
+        with:
+          name: roformer-pinned-webgpu-assets
+          path: build/roformer-package
+      - name: Install verified built RoFormer assets
+        shell: pwsh
+        run: |
+          Move-Item build/roformer-package/studio build/roformer-studio
+          Move-Item build/roformer-package/notices build/roformer-notices
+          if (!(Test-Path build/roformer-studio/index.html)) { throw "Missing RoFormer index" }
+      - name: Fetch exact demucs-rs 0.3.5 source
+        shell: pwsh
+        run: |
+          git clone --depth 1 --branch v0.3.5 https://github.com/nikhilunni/demucs-rs.git demucs-rs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $sha = (git -C demucs-rs rev-parse HEAD).Trim()
+          if ($sha -ne "805d6f72ede20282832ac78c634e8767716c0b21") { throw "Wrong Demucs SHA $sha" }
+      - name: Apply whole-track normalizer and its numerical regression checks
+        shell: pwsh
+        run: |
+          python tools/patch-demucs-normalization.py demucs-rs/demucs-cli/src/separate.rs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s tools -p "test_demucs_normalization.py"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: demucs-rs -> target
+          key: demucs-rs-v0.3.5-normalized-windows
+      - uses: humbletim/install-vulkan-sdk@v1.2
+      - name: Compile normalized native Demucs
+        working-directory: demucs-rs
+        shell: pwsh
+        run: |
+          cargo build --release --locked -p demucs-cli --jobs 2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Prepare isolated Electron packaging
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path build/bin | Out-Null
+          Copy-Item demucs-rs/target/release/demucs.exe build/bin/demucs.exe -ErrorAction Stop
+          Copy-Item demucs-rs/LICENSE build/bin/LICENSE.txt -ErrorAction Stop
+          node tools/make-roformer-builder-config.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node tools/stamp-version.js 0.7.0-roformer.1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build experimental Windows Portable
+        shell: pwsh
+        run: >
+          npx electron-builder --config build/roformer-electron-builder.json
+          --win portable --x64 --publish never
+          --config.extraMetadata.version=0.7.0-roformer.1
+          --config.productName="KindlingControl RoFormer Studio 0.7 Test"
+          --config.appId=dev.darow462.kindlingcontrol.roformer07
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KindlingControl-RoFormer07-Portable-Win-x64
+          path: dist/*.exe
+          if-no-files-found: error
+          retention-days: 14

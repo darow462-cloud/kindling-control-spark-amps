@@ -139,6 +139,13 @@
         <p><strong>Before the first run:</strong> Standard downloads about 84 MB of HTDemucs weights; High Quality also downloads approximately 333 MB of fine-tuned weights. Models are cached locally. Internet is needed only to fetch missing weights. A Vulkan-capable GPU is recommended.</p>
         <p><strong>Limitations:</strong> guitar separation is approximate. In dense metal mixes, overlapping guitars, cymbals, vocals and distorted bass may bleed into other tracks. The six outputs are instrument categories, not guaranteed individual musicians or overdubs.</p>
       </div>
+      <section class="stem-roformer-studio" aria-labelledby="stem-roformer-title">
+        <h3 id="stem-roformer-title">Try another AI model: BS-RoFormer SW</h3>
+        <p>Experimental local WebGPU separation with a different model, including guitar, drums, bass, vocals, piano and other instruments. This is a separate studio inside KindlingControl: compare its guitar stem with Demucs and export WAV for Analyze.</p>
+        <p class="hint">First use requires an explicit model download (~350 MB, kept on this computer). The open-source inference app is packaged locally; the independently trained model weights are not bundled and have no clearly stated upstream license. Only download them if you accept those terms. GPU support and audio quality must be tested on your Windows system.</p>
+        <button type="button" id="stem-open-roformer" class="primary">Open RoFormer studio…</button>
+        <p id="stem-roformer-status" role="status" aria-live="polite" class="stem-status"></p>
+      </section>
       <div id="stem-support-warning" class="banner" hidden>Native stem separation is currently provided only in the dedicated Windows Portable build. This browser/mobile build can still import an already separated WAV file into Analyze.</div>
       <div class="stem-form">
         <div class="stem-settings">

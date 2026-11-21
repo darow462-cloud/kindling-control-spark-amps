@@ -5,18 +5,23 @@
 import { app, BrowserWindow, dialog, ipcMain, net, protocol, shell } from 'electron';
 import { existsSync } from 'node:fs';
 import { StemSeparationService } from './stem-service.js';
+import { ROFORMER_ORIGIN, resolveStudioResource } from './roformer-studio.js';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { join, normalize, sep } from 'node:path';
 
 const root = fileURLToPath(new URL('../src/', import.meta.url));
 const SCHEME = 'kindling';
 const STEM_SCHEME = 'kindling-stem';
+const ROFORMER_SCHEME = 'kindling-roformer';
 
 protocol.registerSchemesAsPrivileged([
   { scheme: SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } },
   // Reads only WAV files produced by this session's trusted separator. URLs
   // cannot access arbitrary local files and work with HTMLAudioElement/fetch.
   { scheme: STEM_SCHEME, privileges: {
+    standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true,
+  } },
+  { scheme: ROFORMER_SCHEME, privileges: {
     standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true,
   } },
 ]);
@@ -29,6 +34,35 @@ let mainWindow = null;
 let stemInput = null;
 let stemOutput = null;
 let stemService = null;
+let roformerStudioWindow = null;
+
+function studioResourcesRoot() {
+  return app.isPackaged
+    ? join(process.resourcesPath, 'roformer-studio')
+    : fileURLToPath(new URL('../build/roformer-studio/', import.meta.url));
+}
+
+function openRoformerStudio() {
+  if (roformerStudioWindow && !roformerStudioWindow.isDestroyed()) {
+    roformerStudioWindow.focus();
+    return;
+  }
+  if (!existsSync(join(studioResourcesRoot(), 'index.html'))) {
+    throw new Error('RoFormer WebGPU studio is not bundled in this build.');
+  }
+  const win = new BrowserWindow({
+    width: 1360, height: 890, minWidth: 760, minHeight: 540,
+    title: 'KindlingControl · BS-RoFormer Studio (experimental)',
+    backgroundColor: '#1b1b1b', autoHideMenuBar: true,
+    webPreferences: {
+      contextIsolation: true, sandbox: true,
+      nodeIntegration: false, webSecurity: true,
+    },
+  });
+  roformerStudioWindow = win;
+  win.once('closed', () => { if (roformerStudioWindow === win) roformerStudioWindow = null; });
+  win.loadURL(`${ROFORMER_ORIGIN}/index.html`);
+}
 
 function trustedMain(event) {
   return mainWindow && !mainWindow.isDestroyed() &&
@@ -121,7 +155,10 @@ app.on('web-contents-created', (_e, contents) => {
     return { action: 'deny' };
   });
   contents.on('will-navigate', (e, url) => {
-    if (!url.startsWith(`${SCHEME}:`)) {
+    const nativeApp = url.startsWith(`${SCHEME}:`);
+    const studioPage = contents === roformerStudioWindow?.webContents &&
+      url.startsWith(`${ROFORMER_ORIGIN}/`);
+    if (!nativeApp && !studioPage) {
       e.preventDefault();
       if (url.startsWith('https:')) shell.openExternal(url);
     }
@@ -145,6 +182,33 @@ app.whenReady().then(() => {
         : event;
       mainWindow.webContents.send('stem:event', message);
     },
+  });
+
+  // Pinned WebAssembly app is served only from its packaged assets.
+  // Model weights are intentionally not bundled and must be downloaded
+  // explicitly by the user through the studio's own Download Model control.
+  protocol.handle(ROFORMER_SCHEME, async (req) => {
+    try {
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        return new Response('Method not allowed', { status: 405 });
+      }
+      const asset = await resolveStudioResource(studioResourcesRoot(), req.url);
+      const source = await net.fetch(pathToFileURL(asset.file).toString());
+      const headers = new Headers(source.headers);
+      headers.set('Content-Type', asset.type);
+      headers.set('X-Content-Type-Options', 'nosniff');
+      return new Response(req.method === 'HEAD' ? null : source.body, {
+        status: source.status, headers,
+      });
+    } catch {
+      return new Response('Studio asset not found', { status: 404 });
+    }
+  });
+
+  ipcMain.handle('roformer:open', async (event) => {
+    if (!trustedMain(event)) throw new Error('Untrusted app window');
+    openRoformerStudio();
+    return true;
   });
 
   protocol.handle(STEM_SCHEME, async (req) => {

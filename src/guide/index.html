@@ -288,6 +288,11 @@
 
       <!-- ------------------------------------------------------------------ -->
       <section id="stems">
+        <h2>Compare with an independent BS-RoFormer guitar stem (0.7 experimental)</h2>
+        <p>In the Windows Portable, select <strong>Stems → Open RoFormer studio…</strong>. This launches a second, locally packaged WebGPU source-separation studio with a different model from Demucs. It keeps its own audio, model cache and interface. It does not change Spark amplifier presets or Bluetooth settings.</p>
+        <p>Within the studio, you may choose <strong>Download model</strong> for an approximately 350 MB BS-RoFormer SW checkpoint. The model weights are <strong>not bundled</strong> and their original licensing is not clearly documented. Download only if acceptable for your use. No song is sent to a cloud inference service.</p>
+        <p>Open the same song, separate its six stems, solo the guitar and compare with the Demucs guitar WAV. Use the studio's Save WAV action, then load it under <strong>Analyze → Reference → Load audio file</strong>. The WebGPU runtime and GPU performance require verification on your Windows hardware; no quality improvement is guaranteed.</p>
+        <h3>Original Demucs separator</h3>
         <h2>Separate a song into six instrument tracks (Windows experimental)</h2>
         <p>The native Windows Portable build can split your own audio file into separate <strong>drums, bass, vocals, guitar, piano and other</strong> WAV files using HTDemucs 6-stem. This is machine-learning inference on your computer, not an EQ filter or cloud service. In <strong>Standard</strong>, the six-stem model downloads about 84 MB of weights once. <strong>High Quality</strong> runs Standard and then the approximately 333 MB fine-tuned model to replace drums, bass and vocals while keeping guitar, piano and other from Standard. It is considerably slower and may improve some instruments, but it cannot guarantee cleaner isolation. Both sets of weights are cached after first download.</p>
         <ol>
