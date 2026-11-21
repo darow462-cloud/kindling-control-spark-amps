@@ -911,3 +911,21 @@ dialog.help-dialog[open] { display: flex; }
   margin-top: 0.15rem; flex-shrink: 0; accent-color: var(--accent);
 }
 .stem-settings .hint { font-size: 0.8rem; color: var(--muted); max-width: 80ch; margin: 0 0 0.25rem; }
+
+/* 0.7 experimental: real GPU RoFormer alternative, entirely separate from
+   the Demucs six-stem panel and Spark amp Bluetooth transport. */
+.stem-roformer-studio {
+  display: grid;
+  justify-items: start;
+  gap: 0.5rem;
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
+  background: var(--surface);
+}
+.stem-roformer-studio h3 { margin: 0; font-size: 1rem; }
+.stem-roformer-studio p { margin: 0; color: var(--muted); max-width: 80ch; line-height: 1.5; font-size: 0.85rem; }
+.stem-roformer-studio .hint { font-size: 0.78rem; }
+.stem-roformer-studio button { margin-top: 0.35rem; }
+.stem-roformer-studio .stem-status { font-size: 0.8rem; overflow-wrap: anywhere; }
