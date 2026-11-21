@@ -218,6 +218,52 @@ by Rust/egui, not exposed as ordinary DOM controls:
   Rust/WebAssembly studio. The JS companion and parent UI are
   updated but the Rust separation code is unchanged.
 
+## Non-destructive audio clip editing (0.7.8 experimental)
+
+- The first-party Stems view now includes **Trim source before
+  separation**, shared by Demucs and RoFormer. After selecting a song,
+  Web Audio decodes the source locally (up to 180 MB input / 15 minutes),
+  draws a waveform and offers draggable boundaries and exact second
+  inputs. Preview plays only the selected interval. **Apply clip to
+  separator** creates a short PCM16 WAV locally with 5 ms edge fades.
+  The original source is never overwritten.
+- For native Demucs, the renderer can ask main Electron to read *only
+  the audio file previously chosen through the native file dialog*.
+  A new narrow IPC `stem:prepare-clip` accepts bounded validated
+  canonical RIFF PCM16 bytes and stages `selected-clip.wav` under a
+  freshly created private temporary directory. Main owns this path
+  and passes it to the unchanged Demucs engine; the renderer cannot
+  provide executable flags, arbitrary paths, or destinations. The
+  directory is cleared upon a new selection, replacement or closing
+  the window. `Use full original` restores the original source.
+- For RoFormer, source cropping sends a user-prepared PCM16 `File`
+  through the existing isolated native `open_song` command with
+  an acknowledgement. The original song remains available for
+  restore; the existing explicit model download and separation
+  semantics do not change.
+- An unapplied selection (including range changes after applying
+  a previous clip) blocks that engine's separation until the user
+  applies the new selection or restores the full song.
+- **Trim all six separated tracks** works in both mixer banks. Users
+  load six aligned waveform envelopes, define one shared time range,
+  preview the segment through the existing mixer and export a ZIP
+  containing six bounded PCM16 WAV files. Every stem is decoded to a
+  common 44.1 kHz timeline for sample-aligned cut positions; source
+  track durations may differ by no more than 0.2 seconds. The
+  original stem WAVs and Mute/Solo settings are not modified.
+  This export is **not** a re-mixed or newly separated audio track.
+- The ZIP uses uncompressed standard ZIP file entries with CRC32,
+  limiting the total content to 512 MB; the browser creates the
+  download locally without remote services. The ZIP export is a
+  separate action and may consume memory on long six-stem songs.
+- This is the first phase of editing: a common synchronized clip
+  for all separated stems. Per-stem independent trim offsets,
+  multisegment timelines and DAW-style waveform editing are not
+  yet implemented.
+- 0.7.8 reuses the SHA-verified native Demucs and pinned Stemyla
+  WebAssembly from the successful 0.7.6 build. No model weights or
+  modified inference code are distributed in the editor change.
+
 ## Technical boundaries
 
 - `desktop/main.js` exposes only `roformer:status` via a trusted main-app IPC, returning a fixed local URL and package availability. The renderer cannot supply file paths, CLI args, executable names or a process to launch, and no second BrowserWindow is created. `src/app/roformer-inline.js` lazy-loads the sandboxed iframe only when Stems is selected, delegates WebGPU through `allow=webgpu`, and preserves the same loaded iframe when switching back from Demucs.
