@@ -1,0 +1,41 @@
+name: KindlingControl 0.7.7 RoFormer Health Smoke
+
+on:
+  push:
+    branches:
+      - feature/v0.7.7-roformer-health-check
+    paths:
+      - '.github/workflows/roformer-health-smoke.yml'
+      - 'src/**'
+      - 'desktop/**'
+      - 'test/**'
+      - 'tools/patch-stemyla-controls.py'
+      - 'tools/install-roformer-transfer.js'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: App/IPC/browser bridge tests (no WASM compilation)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install and test
+        run: |
+          npm ci
+          npm test
+          node --check src/app/roformer-controls.js
+          node --check src/app/roformer-transfer.js
+          node --check src/app/roformer-health.js
+          node --check desktop/roformer-transfer-bridge.js
+          node --check tools/install-roformer-transfer.js
+          python3 -m py_compile tools/patch-stemyla-controls.py
