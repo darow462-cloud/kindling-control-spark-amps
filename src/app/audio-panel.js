@@ -6,6 +6,7 @@ import {
   MAX_AUDIO_FILE_BYTES,
 } from './audio-analysis.js';
 import { generateReferencePreset } from './reference-preset.js';
+import { presetToJson } from '../spark/messages.js';
 
 const MAX_RECORD_SECONDS = 30;
 const fmtTime = (seconds) => {
@@ -449,7 +450,10 @@ export function initAudioPanel(
   proposalUi.export?.addEventListener('click', () => {
     if (!generatedPreset || applyingGenerated) return;
     const preset = generatedPreset.preset;
-    const blob = new Blob([JSON.stringify(preset, null, 2)], { type: 'application/json' });
+    // Use the same interchange format as My presets > Import/Export.
+    const blob = new Blob([JSON.stringify(presetToJson(preset), null, 2)], {
+      type: 'application/json',
+    });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
