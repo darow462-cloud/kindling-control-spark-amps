@@ -157,6 +157,39 @@ by Rust/egui, not exposed as ordinary DOM controls:
   packaging, but the first full Windows WebGPU/UI run is still required
   before promoting this branch to a stable release.
 
+## Automatic RoFormer import and Advanced Studio (0.7.6 experiment)
+
+- **Native Kindling separation only:** after the user explicitly clicks the
+  0.7.5 Separate button, the patched Stemyla app associates a one-time
+  command nonce with its current song's session ID. When the storage path
+  finishes writing all separated WAVs and commits the final session meta,
+  Stemyla sends a completed signal with the same nonce and session ID.
+  The memory path sends that signal only after a successful explicit
+  `store::save_stems` commit. Worker "done" or progress reaching 100%
+  is **not** considered success.
+- The first-party host verifies that the completion came from the same
+  pinned iframe and exact nonce of its most recently acknowledged Kindling
+  run. Only then does it request direct import from that specific session.
+  The isolated OPFS reader refuses if another song is current, any WAV
+  is missing/too large, or fewer than six canonical stems are present.
+  Files must still pass the host Blob and size checks.
+- Results feed the RoFormer six-track mixer and automatically fill the
+  RoFormer guitar position in the existing A/B player. The user can
+  listen, mute/solo and send guitar to Analyze. Importing never changes
+  the WAVs, uploads audio, downloads a model, or writes to a source file.
+- **Advanced Studio** is collapsed by default. Its actual iframe is
+  retained and kept laid out, not torn down or reloaded, so the Rust app
+  and workers can continue running. Click Show Advanced Studio for
+  diagnostics, extra upstream controls or manual export. Because
+  browsers can throttle offscreen rendering, this behavior must be
+  checked on the target Windows Electron/WebGPU installation.
+- The original **Import directly from RoFormer** button and manual
+  WAV selection remain available. A separation initiated solely inside
+  Advanced Studio deliberately does not silently trigger the new auto
+  path. RoFormer OPFS failure does not produce a false completed signal.
+- This is still an experimental feature until GPU inference, OPFS writes,
+  session binding, audio playback and controls are verified on Windows.
+
 ## Technical boundaries
 
 - `desktop/main.js` exposes only `roformer:status` via a trusted main-app IPC, returning a fixed local URL and package availability. The renderer cannot supply file paths, CLI args, executable names or a process to launch, and no second BrowserWindow is created. `src/app/roformer-inline.js` lazy-loads the sandboxed iframe only when Stems is selected, delegates WebGPU through `allow=webgpu`, and preserves the same loaded iframe when switching back from Demucs.
