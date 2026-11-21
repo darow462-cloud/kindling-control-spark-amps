@@ -110,6 +110,9 @@ test('source editor blocks unapplied range and stages/clears Demucs temporary cl
   assert.deepEqual(events.map(e=>e.type),['apply','restore']);
   assert.equal(editor.canSeparate('demucs'),true);
   assert.deepEqual(editor.getRange(),{start:0,end:2,duration:2});
+  editor.clearSource();
+  assert.equal(editor.getSource(),null);
+  assert.equal(editor.canSeparate('demucs'),true,'missing preview cannot block a new full song');
   editor.dispose();
 });
 
