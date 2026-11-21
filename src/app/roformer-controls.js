@@ -23,6 +23,8 @@ export function initRoFormerControls({
   FileType = File,
   timeoutMs = 15000,
   onCompleted = () => {},
+  onSourceSelected = () => {},
+  onBeforeSeparate = () => true,
 } = {}) {
   if (!root || !frame) return null;
   const $ = (name) => root.querySelector('#' + name);
@@ -67,7 +69,7 @@ export function initRoFormerControls({
     pending = null;
     render();
   }
-  function send(action, file) {
+  function send(action, file, onAck = null) {
     if (disposed || !state || pending || frame.src !== STUDIO_URL) return false;
     if (action === 'open_song' && !validRoFormerSong(file, FileType)) {
       say('Choose a supported song under 350 MB.', 'error');
@@ -81,9 +83,12 @@ export function initRoFormerControls({
     pending = {
       nonce,
       action,
+      onAck,
       timer: setTimeout(() => {
         if (pending?.nonce !== nonce) return;
+        const callback = pending.onAck;
         forgetPending();
+        callback?.(false, 'RoFormer did not acknowledge the action.');
         say('RoFormer did not acknowledge the action. Open Advanced Studio for details.', 'error');
       }, timeoutMs),
     };
@@ -94,7 +99,9 @@ export function initRoFormerControls({
     try {
       target.postMessage({ type: COMMAND, nonce, action, ...(file ? { file } : {}) }, '*');
     } catch (error) {
+      const callback = pending?.onAck;
       forgetPending();
+      callback?.(false, error.message);
       say('Could not send command to RoFormer: ' + error.message, 'error');
       return false;
     }
@@ -130,7 +137,9 @@ export function initRoFormerControls({
     } else if (message.type === ACK && pending && message.nonce === pending.nonce) {
       const action = pending.action;
       const nonce = pending.nonce;
+      const callback = pending.onAck;
       forgetPending();
+      callback?.(!!message.ok, String(message.message || '').slice(0, 240));
       if (!message.ok) {
         say(String(message.message || 'RoFormer rejected the action.').slice(0, 240), 'error');
       } else {
@@ -158,8 +167,10 @@ export function initRoFormerControls({
     }
   }
   function onLoad() {
+    const callback = pending?.onAck;
     state = null;
     lastStateAt = 0;
+    callback?.(false, 'RoFormer studio reloaded.');
     acceptedSeparation = null;
     forgetPending();
     say('Connecting to the native RoFormer controls…');
@@ -170,18 +181,37 @@ export function initRoFormerControls({
     const file = selected.files?.[0];
     selected.value = '';
     if (!file) return;
-    if (send('open_song', file)) songName.textContent = file.name;
+    if (send('open_song', file)) {
+      songName.textContent = file.name;
+      try { onSourceSelected(file); } catch { /* clip editor optional */ }
+    }
   });
   download.addEventListener('click', () => { if (!download.disabled) send('download_model'); });
-  start.addEventListener('click', () => { if (!start.disabled) send('separate'); });
+  start.addEventListener('click', () => {
+    if (start.disabled) return;
+    try {
+      if (onBeforeSeparate() !== false) send('separate');
+      else say('Apply the selected source clip before separation.', 'error');
+    } catch (error) { say(String(error.message || error).slice(0,180), 'error'); }
+  });
   windowRef.addEventListener('message', onMessage);
   frame.addEventListener('load', onLoad);
   render();
   return {
     getState: () => state,
     getLastStateAt: () => lastStateAt,
+    loadClip(file) {
+      return new Promise((resolve, reject) => {
+        const sent = send('open_song', file, (ok, message) => {
+          if (ok) resolve(true);
+          else reject(new Error(message || 'RoFormer rejected the selected WAV clip.'));
+        });
+        if (!sent) reject(new Error('RoFormer is busy or not ready to load a clip.'));
+      });
+    },
     dispose() {
       acceptedSeparation = null;
+      pending?.onAck?.(false, 'RoFormer controls closed.');
       disposed = true;
       forgetPending();
       windowRef.removeEventListener('message', onMessage);
