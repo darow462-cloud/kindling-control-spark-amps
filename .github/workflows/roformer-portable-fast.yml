@@ -1,4 +1,4 @@
-name: KindlingControl 0.7.3 Shared Stem Mixer Windows Portable
+name: KindlingControl 0.7.4 Direct RoFormer WAV Import Windows Portable
 
 # Fast packaging after source and model-inference code were built from pinned
 # upstream code in run 44881816942 (WASM), and normalized Demucs was compiled
@@ -6,13 +6,14 @@ name: KindlingControl 0.7.3 Shared Stem Mixer Windows Portable
 on:
   push:
     branches:
-      - feature/v0.7.3-shared-stem-mixer
+      - feature/v0.7.4-roformer-opfs-transfer
     paths:
       - '.github/workflows/roformer-portable-fast.yml'
       - 'desktop/**'
       - 'src/**'
       - 'test/**'
       - 'tools/make-roformer-builder-config.js'
+      - 'tools/install-roformer-transfer.js'
       - 'package.json'
       - 'package-lock.json'
   workflow_dispatch:
@@ -55,6 +56,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node --check src/app/audio-panel.js
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check src/app/roformer-transfer.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check desktop/roformer-transfer-bridge.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check tools/install-roformer-transfer.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       # Built from pinned Stemyla commit b2a771808d36f9a8d2f333528805d0ee2c1040a8;
       # its WebAssembly job passed even though the downstream Windows job
@@ -83,6 +90,10 @@ jobs:
         run: |
           Move-Item build/roformer-package/studio build/roformer-studio
           Move-Item build/roformer-package/notices build/roformer-notices
+          # Add a KindlingControl-owned read-only OPFS bridge to the pinned
+          # Stemyla HTML. Never change pinned WASM or redistribute weights.
+          node tools/install-roformer-transfer.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $wasm = @(Get-ChildItem build/roformer-studio -Recurse -Filter *.wasm -File)
           if ($wasm.Count -ne 4) { throw "Expected 4 pinned WASM modules, got $($wasm.Count)" }
           $portable = @(Get-ChildItem build/normalized062 -Recurse -Filter *.exe -File)
@@ -130,7 +141,7 @@ jobs:
           Copy-Item $license build/bin/LICENSE.txt
           node tools/make-roformer-builder-config.js
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          node tools/stamp-version.js 0.7.3-mixer.1
+          node tools/stamp-version.js 0.7.4-direct.1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build independent Windows Portable with two real models
@@ -138,13 +149,13 @@ jobs:
         run: >
           npx electron-builder --config build/roformer-electron-builder.json
           --win portable --x64 --publish never
-          --config.extraMetadata.version=0.7.3-mixer.1
-          --config.productName="KindlingControl RoFormer Mixer 0.7.3 Test"
-          --config.appId=dev.darow462.kindlingcontrol.roformer073mixer
+          --config.extraMetadata.version=0.7.4-direct.1
+          --config.productName="KindlingControl RoFormer Direct 0.7.4 Test"
+          --config.appId=dev.darow462.kindlingcontrol.roformer074direct
 
       - uses: actions/upload-artifact@v4
         with:
-          name: KindlingControl-RoFormer073-Mixer-Portable-Win-x64
+          name: KindlingControl-RoFormer074-Direct-Portable-Win-x64
           path: dist/*.exe
           if-no-files-found: error
           retention-days: 14
