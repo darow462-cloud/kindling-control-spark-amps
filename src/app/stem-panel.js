@@ -2,19 +2,31 @@
 // go through the narrow kindlingDesktop.stems preload bridge.
 import { initInlineRoformer } from './roformer-inline.js';
 import { initStemCompare } from './stem-compare.js';
+import { initStemMixer } from './stem-mixer.js';
 
 const fmtSize = (size) => `${(size / (1024 * 1024)).toFixed(1)} MB`;
 
-export function initStemPanel({ root = document.getElementById('panel-stems'), onAnalyzeGuitar } = {}) {
+export function initStemPanel({ root = document.getElementById('panel-stems'), onAnalyzeGuitar, onAnalyzeImportedGuitar } = {}) {
   if (!root) return null;
   const $ = (id) => root.querySelector('#' + id);
   const api = window.kindlingDesktop?.stems;
   const supported = !!api?.supported;
   const warn = $('stem-support-warning');
   warn.hidden = supported;
+  let mixer = null;
   const compare = initStemCompare({
     root: $('stem-compare'),
     onPlay: () => {
+      mixer?.pause();
+      for (const audio of $('stem-track-list').querySelectorAll('audio')) audio.pause();
+    },
+  });
+  mixer = initStemMixer({
+    root: $('stem-mixer'),
+    onAnalyzeDemucs: onAnalyzeGuitar,
+    onAnalyzeRoFormer: onAnalyzeImportedGuitar,
+    onPlay: () => {
+      compare?.pause();
       for (const audio of $('stem-track-list').querySelectorAll('audio')) audio.pause();
     },
   });
@@ -87,6 +99,7 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
       // Single-track audition: starting a player pauses the other instruments.
       player.addEventListener('play', () => {
         compare?.pause();
+        mixer?.pause();
         for (const other of list.querySelectorAll('audio')) {
           if (other !== player) other.pause();
         }
@@ -97,6 +110,7 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
     $('stem-results').hidden = !state.stems.length;
     const guitar = state.stems.find((stem) => stem.name === 'guitar');
     if (guitar) compare?.setDemucs(guitar);
+    mixer?.loadDemucs(state.stems);
     updateButtons();
   }
 
@@ -199,6 +213,7 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
     dispose();
     inlineRoformer?.dispose();
     compare?.dispose();
+    mixer?.dispose();
     clearPlayers();
   }, { once: true });
   updateButtons();
