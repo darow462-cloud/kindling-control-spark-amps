@@ -1346,3 +1346,45 @@ dialog.help-dialog[open] { display: flex; }
   .stem-clip-range-grid > label { grid-template-columns: 40px minmax(0,1fr) 5rem; }
   .stem-mixer-clip-row { grid-template-columns: 59px minmax(0,1fr); }
 }
+
+
+/* --- 0.7.9: playback cursor and seek control beneath each waveform editor --- */
+.stem-playback-transport {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  min-width: 0;
+}
+.stem-playback-transport label {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.stem-playback-transport input[type="range"] {
+  width: 100%;
+  min-width: 0;
+  cursor: pointer;
+  accent-color: #e4b875;
+}
+.stem-playback-transport input[type="range"]:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.stem-playback-clock {
+  font: 0.8rem/1.5 ui-monospace, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  color: #e4b875;
+  white-space: nowrap;
+}
+@media (width < 530px) {
+  .stem-playback-transport {
+    grid-template-columns: auto 1fr;
+    gap: 0.4rem;
+  }
+  .stem-playback-transport input[type="range"] {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .stem-playback-clock { justify-self: end; }
+}
