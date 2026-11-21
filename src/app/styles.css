@@ -1154,3 +1154,13 @@ dialog.help-dialog[open] { display: flex; }
   .stem-mixer-row button { padding-inline: 0.2rem; }
   .stem-mixer-toolbar .stem-engine-switch { flex-wrap: wrap; }
 }
+
+
+/* ---- 0.7.4: direct local RoFormer stem transfer ----------------------------- */
+#stem-mixer-import-direct { max-inline-size: 100%; }
+#stem-mixer-transfer-status { margin-block: 0.7rem; }
+#stem-mixer-transfer-status[data-kind="error"] { color: var(--led); }
+#stem-mixer-transfer-status[data-kind="success"] { color: var(--ok); }
+@media (width < 640px) {
+  #stem-mixer-import-direct { width: 100%; }
+}
