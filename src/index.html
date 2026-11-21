@@ -204,6 +204,34 @@
         </div>
       </div>
       </section>
+      <section id="stem-compare" class="stem-compare" aria-labelledby="stem-compare-title">
+        <h3 id="stem-compare-title">Compare guitar stems · A/B</h3>
+        <p class="hint">Compare the same moment of two guitar WAVs. The most recent Demucs result is added to A automatically. For B, export guitar.wav from the embedded RoFormer workspace and select it below. Playback stays local; switching A/B keeps the current position. This is a listening comparison, not synchronized mixing or loudness normalization.</p>
+        <div class="stem-compare-files">
+          <div class="stem-compare-source">
+            <label for="stem-compare-a-file"><strong>A · Demucs</strong> — choose a different WAV (optional)</label>
+            <input id="stem-compare-a-file" type="file" accept=".wav,audio/wav">
+            <span id="stem-compare-a-name" class="stem-file-label">No WAV selected</span>
+          </div>
+          <div class="stem-compare-source">
+            <label for="stem-compare-b-file"><strong>B · RoFormer</strong> — load exported guitar WAV</label>
+            <input id="stem-compare-b-file" type="file" accept=".wav,audio/wav">
+            <span id="stem-compare-b-name" class="stem-file-label">No WAV selected</span>
+          </div>
+        </div>
+        <div class="stem-compare-transport" role="group" aria-label="Guitar stem comparison controls">
+          <button type="button" id="stem-compare-a" aria-pressed="false" disabled>A · Demucs</button>
+          <button type="button" id="stem-compare-b" aria-pressed="false" disabled>B · RoFormer</button>
+          <button type="button" id="stem-compare-play" class="primary" disabled>Play</button>
+          <button type="button" id="stem-compare-stop" disabled>Stop</button>
+        </div>
+        <div class="stem-compare-timeline">
+          <label for="stem-compare-seek">Position</label>
+          <input type="range" id="stem-compare-seek" min="0" max="1000" value="0" disabled>
+          <span id="stem-compare-clock">0:00 / 0:00</span>
+        </div>
+        <p id="stem-compare-status" class="stem-status" role="status" aria-live="polite">Load the two guitar WAVs to compare.</p>
+      </section>
     </section>
 
     <section id="panel-analysis" role="tabpanel" aria-labelledby="tab-analysis" hidden>
