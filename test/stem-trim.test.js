@@ -121,5 +121,5 @@ test('clip UI integrated with both separators and all six source rows',()=>{
   assert.match(native,/stem:prepare-clip/);
   assert.match(native,/inputPath: stemClipStore\.path \|\| stemInput/);
   assert.match(preload,/prepareClip:/);
-  assert.match(mixer,/previewRange\(start, end\)/);
+  assert.match(mixer,/previewRange\(start, end, from = start\)/);
 });
