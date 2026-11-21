@@ -83,7 +83,32 @@ jobs:
           if (!(Test-Path $seven)) { throw "7-Zip is missing from Windows runner" }
           $destination = Join-Path $PWD "build/normalized-extracted"
           New-Item -ItemType Directory -Force -Path $destination | Out-Null
-          & $seven x $portable[0].FullName "-o$destination" "resources/demucs/demucs.exe" "resources/demucs/LICENSE.txt" -y
+          # The Electron Portable EXE is an NSIS wrapper around an embedded
+          # genuine 7z payload. 7-Zip treats the wrapper as NSIS and hides
+          # nested resource names; extract the verified payload first.
+          $bytes = [System.IO.File]::ReadAllBytes($portable[0].FullName)
+          $signature = [byte[]]@(0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c)
+          $offset = 0
+          $start = -1
+          while ($offset -lt $bytes.Length - 6) {
+            $candidate = [Array]::IndexOf($bytes, [byte]0x37, $offset)
+            if ($candidate -lt 0) { break }
+            if ($bytes[$candidate + 1] -eq $signature[1] -and
+                $bytes[$candidate + 2] -eq $signature[2] -and
+                $bytes[$candidate + 3] -eq $signature[3] -and
+                $bytes[$candidate + 4] -eq $signature[4] -and
+                $bytes[$candidate + 5] -eq $signature[5]) {
+              $start = $candidate
+              break
+            }
+            $offset = $candidate + 1
+          }
+          if ($start -lt 0) { throw "Embedded 7z payload not found" }
+          $payload = Join-Path $destination "verified-normalized-062.7z"
+          $writer = [System.IO.File]::Create($payload)
+          try { $writer.Write($bytes, $start, $bytes.Length - $start) }
+          finally { $writer.Dispose() }
+          & $seven x $payload "-o$destination" "resources/demucs/demucs.exe" "resources/demucs/LICENSE.txt" -y
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $native = Join-Path $destination "resources/demucs/demucs.exe"
           $license = Join-Path $destination "resources/demucs/LICENSE.txt"
