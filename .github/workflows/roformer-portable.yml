@@ -53,7 +53,11 @@ jobs:
           curl --fail --location --retry 3 --silent --show-error \
             -o /tmp/trunk.tgz.sha256 \
             https://github.com/trunk-rs/trunk/releases/download/v0.22.1/trunk-x86_64-unknown-linux-gnu.tar.gz.sha256
-          (cd /tmp && sha256sum -c trunk.tgz.sha256)
+          # Upstream publishes a raw 64-hex digest, not a sha256sum filename record.
+          expected=$(tr -d '[:space:]' < /tmp/trunk.tgz.sha256)
+          actual=$(sha256sum /tmp/trunk.tgz | cut -d ' ' -f1)
+          test "${#expected}" -eq 64
+          test "$actual" = "$expected"
           mkdir -p /tmp/trunk-release
           tar -xzf /tmp/trunk.tgz -C /tmp/trunk-release
           trunk_bin=$(find /tmp/trunk-release -type f -name trunk -print -quit)
