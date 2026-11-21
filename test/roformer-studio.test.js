@@ -55,7 +55,7 @@ test('studio resource resolver refuses symlinks to other local folders', async (
   }
 });
 
-test('Electron preload only exposes a fixed RoFormer launch IPC', async () => {
+test('Electron preload exposes only read-only integrated RoFormer status IPC', async () => {
   let desktop;
   const invoked = [];
   const source = readFileSync(new URL('../desktop/preload.cjs', import.meta.url), 'utf8');
@@ -69,8 +69,9 @@ test('Electron preload only exposes a fixed RoFormer launch IPC', async () => {
       },
     }),
   });
-  assert.equal(typeof desktop?.roformer?.openStudio, 'function');
+  assert.equal(typeof desktop?.roformer?.status, 'function');
+  assert.equal(desktop.roformer.openStudio, undefined, 'no secondary window action');
   assert.equal(desktop.roformer.spawn, undefined);
-  assert.equal(await desktop.roformer.openStudio(), true);
-  assert.deepEqual(invoked, [{ channel: 'roformer:open', args: [] }]);
+  assert.equal(await desktop.roformer.status(), true);
+  assert.deepEqual(invoked, [{ channel: 'roformer:status', args: [] }]);
 });
