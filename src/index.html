@@ -160,8 +160,12 @@
           <progress id="stem-roformer-control-progress" max="100" hidden></progress>
           <p id="stem-roformer-control-status" class="stem-status" role="status" aria-live="polite">Open the Stems tab to connect to RoFormer.</p>
         </div>
-        <p class="hint">The first download (~350 MB) is optional and starts only when you press Download model below. The checkpoint's original license is unclear; the open-source app and model weights are separate. Solo, Mute and WAV export are inside the integrated workspace.</p>
-        <p id="stem-roformer-status" class="stem-status" role="status" aria-live="polite">The RoFormer workspace opens here when you select Stems.</p>
+        <div class="stem-roformer-advanced-toolbar">
+          <button type="button" id="stem-roformer-advanced-toggle"
+            aria-expanded="false" aria-controls="stem-roformer-frame-shell">Show Advanced Studio</button>
+          <span class="hint">Full Stemyla interface for advanced settings, diagnostics and manual export.</span>
+        </div>
+        <p id="stem-roformer-status" class="stem-status" role="status" aria-live="polite">The RoFormer workspace initializes locally when you open Stems.</p>
         <div id="stem-roformer-frame-shell" class="stem-roformer-frame-shell">
           <iframe id="stem-roformer-frame"
             title="BS-RoFormer SW integrated six-track separation workspace"
@@ -171,7 +175,7 @@
             loading="lazy"
             hidden></iframe>
         </div>
-        <p class="hint">Your model cache and songs remain inside the RoFormer workspace. Export a guitar WAV to load it in Analyze; existing Spark amp presets are unaffected.</p>
+        <p class="hint">Your model cache and songs remain inside the local RoFormer workspace. Completed tracks are imported automatically after separation started with the controls above. Use Advanced Studio or manual WAV import if browser storage is unavailable. Spark amp presets are unaffected.</p>
       </section>
       <section id="stem-demucs-pane" class="stem-demucs-integrated" aria-labelledby="stem-engine-demucs" hidden>
       <p>Separate a song locally into <strong>drums, bass, vocals, guitar, piano and other instruments</strong> using HTDemucs 6-stem. Each result is saved as an individual WAV file that you can listen to or open in a DAW. No audio is sent to a cloud service.</p>
@@ -222,7 +226,7 @@
       </section>
       <section id="stem-mixer" class="stem-mixer" aria-labelledby="stem-mixer-title">
         <h3 id="stem-mixer-title">Six-track listening mixer</h3>
-        <p class="hint">Listen to Demucs or RoFormer stems together. When native Demucs finishes, its six WAVs are loaded automatically. For RoFormer, export WAVs from the embedded studio and import them here. The six media players follow a common timeline approximately (not sample-accurate DAW sync); their volumes, Mute and Solo affect playback only, never saved files.</p>
+        <p class="hint">Listen to Demucs or RoFormer stems together. Both engines send their completed six WAVs to this mixer automatically when launched from KindlingControl. RoFormer auto-import requires finished local storage; use Direct Import or manual WAVs as fallback. Playback is approximate rather than sample-accurate. Volume, Mute and Solo never change the exported audio.</p>
         <div class="stem-mixer-toolbar">
           <div role="group" class="stem-engine-switch" aria-label="Mixer source">
             <button type="button" id="stem-mixer-demucs" aria-pressed="true" class="active">Demucs mix</button>
@@ -234,7 +238,7 @@
           </label>
         </div>
         <p id="stem-mixer-transfer-status" class="stem-status" role="status" aria-live="polite">Open RoFormer to enable direct import of its completed tracks.</p>
-        <p class="hint">After RoFormer finishes separation, click <strong>Import directly from RoFormer</strong>. It reads the completed WAVs from the isolated workspace on your computer; there is no export or file picker. Manual WAV import remains available if browser storage is unavailable. Start playback at moderate volume.</p>
+        <p class="hint">After a completed KindlingControl RoFormer run, the six WAV tracks load automatically into the mixer and guitar A/B comparison. <strong>Import directly from RoFormer</strong> remains available for finished Advanced Studio sessions or to retry. Choose WAVs manually if local browser storage is unavailable. Start playback at moderate volume.</p>
         <div class="stem-mixer-headings" aria-hidden="true">
           <span>Instrument</span><span>File</span><span>Source</span><span>Mute</span><span>Solo</span><span>Volume</span><span>Level</span>
         </div>
@@ -253,7 +257,7 @@
       </section>
       <section id="stem-compare" class="stem-compare" aria-labelledby="stem-compare-title">
         <h3 id="stem-compare-title">Compare guitar stems · A/B</h3>
-        <p class="hint">Compare the same moment of two guitar WAVs. The most recent Demucs result is added to A automatically. For B, export guitar.wav from the embedded RoFormer workspace and select it below. Playback stays local; switching A/B keeps the current position. This is a listening comparison, not synchronized mixing or loudness normalization.</p>
+        <p class="hint">Compare the same passage from both engines. The latest Demucs guitar fills A and directly imported RoFormer guitar fills B automatically; you can also choose a WAV manually. Switching A/B preserves the position. This is local listening comparison, not synchronized mixing or loudness normalization.</p>
         <div class="stem-compare-files">
           <div class="stem-compare-source">
             <label for="stem-compare-a-file"><strong>A · Demucs</strong> — choose a different WAV (optional)</label>
@@ -261,7 +265,7 @@
             <span id="stem-compare-a-name" class="stem-file-label">No WAV selected</span>
           </div>
           <div class="stem-compare-source">
-            <label for="stem-compare-b-file"><strong>B · RoFormer</strong> — load exported guitar WAV</label>
+            <label for="stem-compare-b-file"><strong>B · RoFormer</strong> — optional manual guitar WAV</label>
             <input id="stem-compare-b-file" type="file" accept=".wav,audio/wav">
             <span id="stem-compare-b-name" class="stem-file-label">No WAV selected</span>
           </div>
