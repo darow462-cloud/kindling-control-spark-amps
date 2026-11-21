@@ -65,7 +65,7 @@ test('source editor blocks unapplied range and stages/clears Demucs temporary cl
     'stem-source-name','stem-source-trim-status','stem-source-waveform',
     'stem-source-start','stem-source-end','stem-source-start-number',
     'stem-source-end-number','stem-source-duration','stem-source-apply',
-    'stem-source-reset','stem-source-preview','stem-source-preview-stop',
+    'stem-source-reset','stem-source-export','stem-source-preview','stem-source-preview-stop',
   ]);
   const events=[];
   let seq=0;
