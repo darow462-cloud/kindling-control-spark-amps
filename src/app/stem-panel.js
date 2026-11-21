@@ -114,6 +114,7 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
       if (type === 'file') {
         state.file = selected;
         $('stem-file-label').textContent = selected.name;
+        sourceClip?.clearSource();
         if (api?.readInput) {
           try {
             const audio = await api.readInput();
