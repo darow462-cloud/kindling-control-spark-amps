@@ -36,6 +36,7 @@ export function initRoFormerControls({
   if (![choose,selected,download,start,songName,status,progress].every(Boolean)) return null;
 
   let state = null;
+  let lastStateAt = 0;
   let pending = null;
   let acceptedSeparation = null;
   let disposed = false;
@@ -112,6 +113,7 @@ export function initRoFormerControls({
           typeof next.separating !== 'boolean' ||
           typeof next.canSeparate !== 'boolean') return;
       state = next;
+      lastStateAt = Date.now();
       if (!pending) {
         if (next.stopped) say('RoFormer worker stopped. Open Advanced Studio for the error.', 'error');
         else if (next.separating) say('Separating six stems on your GPU… ' +
@@ -157,6 +159,7 @@ export function initRoFormerControls({
   }
   function onLoad() {
     state = null;
+    lastStateAt = 0;
     acceptedSeparation = null;
     forgetPending();
     say('Connecting to the native RoFormer controls…');
@@ -176,6 +179,7 @@ export function initRoFormerControls({
   render();
   return {
     getState: () => state,
+    getLastStateAt: () => lastStateAt,
     dispose() {
       acceptedSeparation = null;
       disposed = true;
