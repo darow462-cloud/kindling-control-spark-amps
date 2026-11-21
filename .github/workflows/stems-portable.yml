@@ -12,6 +12,7 @@ on:
       - 'src/**'
       - 'test/**'
       - 'tools/patch-demucs-normalization.py'
+      - 'tools/test_demucs_normalization.py'
       - 'tools/make-stem-builder-config.js'
       - 'package.json'
       - 'package-lock.json'
