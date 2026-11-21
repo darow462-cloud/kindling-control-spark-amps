@@ -204,6 +204,35 @@
         </div>
       </div>
       </section>
+      <section id="stem-mixer" class="stem-mixer" aria-labelledby="stem-mixer-title">
+        <h3 id="stem-mixer-title">Six-track listening mixer</h3>
+        <p class="hint">Listen to Demucs or RoFormer stems together. When native Demucs finishes, its six WAVs are loaded automatically. For RoFormer, export WAVs from the embedded studio and import them here. The six media players follow a common timeline approximately (not sample-accurate DAW sync); their volumes, Mute and Solo affect playback only, never saved files.</p>
+        <div class="stem-mixer-toolbar">
+          <div role="group" class="stem-engine-switch" aria-label="Mixer source">
+            <button type="button" id="stem-mixer-demucs" aria-pressed="true" class="active">Demucs mix</button>
+            <button type="button" id="stem-mixer-roformer" aria-pressed="false">RoFormer mix</button>
+          </div>
+          <label class="stem-mixer-import" for="stem-mixer-import">Import exported RoFormer WAVs
+            <input id="stem-mixer-import" type="file" accept=".wav,audio/wav" multiple>
+          </label>
+        </div>
+        <p class="hint">Batch import recognizes WAV filenames containing drums, bass, vocals, guitar, piano or other. If a filename is unusual, select the RoFormer mix and assign its WAV to the matching row manually. Start at moderate volume.</p>
+        <div class="stem-mixer-headings" aria-hidden="true">
+          <span>Instrument</span><span>File</span><span>Source</span><span>Mute</span><span>Solo</span><span>Volume</span><span>Level</span>
+        </div>
+        <div id="stem-mixer-rows" class="stem-mixer-rows"></div>
+        <div class="stem-mixer-controls">
+          <button type="button" id="stem-mixer-play" class="primary" disabled>Play mix</button>
+          <button type="button" id="stem-mixer-stop" disabled>Stop</button>
+          <button type="button" id="stem-mixer-analyze-guitar" disabled>Send guitar to Analyze</button>
+        </div>
+        <div class="stem-mixer-timeline">
+          <label for="stem-mixer-seek">Position</label>
+          <input id="stem-mixer-seek" type="range" min="0" max="1000" value="0" disabled>
+          <span id="stem-mixer-clock">0:00 / 0:00</span>
+        </div>
+        <p id="stem-mixer-status" class="stem-status" role="status" aria-live="polite">No stems loaded. Complete Demucs or import exported RoFormer WAVs.</p>
+      </section>
       <section id="stem-compare" class="stem-compare" aria-labelledby="stem-compare-title">
         <h3 id="stem-compare-title">Compare guitar stems · A/B</h3>
         <p class="hint">Compare the same moment of two guitar WAVs. The most recent Demucs result is added to A automatically. For B, export guitar.wav from the embedded RoFormer workspace and select it below. Playback stays local; switching A/B keeps the current position. This is a listening comparison, not synchronized mixing or loudness normalization.</p>
