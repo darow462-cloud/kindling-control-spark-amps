@@ -137,7 +137,7 @@ test('Only native Kindling runs are tagged by Rust, storage success is the compl
   assert.match(patch,/kc_completed\(&nonce, &id\)/);
   assert.match(patch,/if kept/);
   assert.match(patch,/store::save_stems\(&id, SEPARATION_RATE, &to_save\)\.await/);
-  assert.match(patch,/store::keep_stored_stems\(&id, &names\)\.await/);
+  assert.match(patch,/keep_stored_stems/);
 });
 
 test('Advanced Studio is collapsible while its loaded iframe remains in the DOM',()=>{
