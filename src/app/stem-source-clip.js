@@ -27,6 +27,7 @@ export function initSourceClip({
     apply: $('stem-source-apply'), export: $('stem-source-export'),
     reset: $('stem-source-reset'),
     preview: $('stem-source-preview'), stop: $('stem-source-preview-stop'),
+    seek: $('stem-source-seek'), playbackClock: $('stem-source-playback-clock'),
   };
   if (!Object.values(els).every(Boolean)) return null;
 
@@ -56,6 +57,16 @@ export function initSourceClip({
     return !!applied && Math.abs(applied.start - start) < 0.005 &&
       Math.abs(applied.end - end) < 0.005;
   }
+  function updateTransport() {
+    if (disposed) return;
+    const time = Number.isFinite(audio.currentTime)
+      ? Math.max(0, Math.min(duration, audio.currentTime)) : 0;
+    els.seek.disabled = !source || !loaded || !duration || busy;
+    els.seek.value = duration ? String(Math.round(time / duration * 1000)) : '0';
+    els.playbackClock.textContent = durationClock(time) + ' / ' + durationClock(duration);
+    els.preview.textContent = !audio.paused ? 'Pause preview' : 'Play selection';
+    draw();
+  }
   function refresh() {
     if (disposed) return;
     els.start.value = String(Math.round(start / (duration || 1) * 1000));
@@ -72,7 +83,7 @@ export function initSourceClip({
     els.reset.disabled = !source || busy || (!isTrimmed() && !applied);
     els.name.textContent = source ? source.name + ' · ' +
       (source.engine === 'demucs' ? 'Demucs' : 'RoFormer') : 'Choose an audio file in either engine';
-    draw();
+    updateTransport();
   }
   function draw() {
     const canvas = els.waveform;
@@ -98,6 +109,12 @@ export function initSourceClip({
     for (const x of [a, b]) {
       ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
     }
+    // Separate amber playhead from the cyan trim start/end boundaries.
+    const time = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+    const playhead = Math.max(0, Math.min(w, time / duration * w));
+    ctx.strokeStyle = '#f1bd74';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(playhead, 0); ctx.lineTo(playhead, h); ctx.stroke();
   }
   function setRange(a, b) {
     if (!duration || busy) return;
@@ -110,6 +127,10 @@ export function initSourceClip({
     start = Math.max(0, Math.min(duration - step, a));
     end = Math.max(start + step, Math.min(duration, b));
     audio.pause();
+    if (!Number.isFinite(audio.currentTime) ||
+        audio.currentTime < start || audio.currentTime > end) {
+      audio.currentTime = start;
+    }
     refresh();
     if (isApplied()) say('The selected clip is ready for separation.', 'success');
     else if (isTrimmed()) say('Selection changed. Apply this clip before starting separation.');
@@ -173,6 +194,7 @@ export function initSourceClip({
       duration = data.duration;
       start = 0;
       end = duration;
+      audio.currentTime = 0;
       loaded = true;
       say('Drag the waveform handles or enter exact times in seconds. The original stays untouched.');
       refresh();
@@ -244,26 +266,48 @@ export function initSourceClip({
         else await onRoFormerRestore(source.file);
       }
       start = 0; end = duration; applied = null;
+      audio.currentTime = 0;
       say('Original full song restored. No source audio was modified.', 'success');
     } catch (error) {
       say('Could not restore the original source: ' + error.message, 'error');
     } finally { busy = false; refresh(); }
   }
   async function preview() {
-    if (!source || !duration || busy) return;
-    try {
+    if (!source || !duration || !loaded || busy) return;
+    if (!audio.paused) {
       audio.pause();
-      audio.currentTime = start;
+      updateTransport();
+      return;
+    }
+    try {
+      // Resume from the slider location; restart only at the end or outside
+      // the currently selected trim interval.
+      if (!Number.isFinite(audio.currentTime) ||
+          audio.currentTime < start || audio.currentTime >= end - 0.015) {
+        audio.currentTime = start;
+      }
       await audio.play();
+      updateTransport();
     } catch (error) {
       say('Could not preview this audio: ' + error.message, 'error');
     }
   }
   audio.addEventListener('timeupdate', () => {
-    if (duration && audio.currentTime >= end - 0.015) {
+    if (duration && !audio.paused && audio.currentTime >= end - 0.015) {
       audio.pause();
-      audio.currentTime = start;
+      audio.currentTime = end;
     }
+    updateTransport();
+  });
+  audio.addEventListener('play', updateTransport);
+  audio.addEventListener('pause', updateTransport);
+  audio.addEventListener('ended', updateTransport);
+  els.seek.addEventListener('input', () => {
+    if (!loaded || busy || !duration) return;
+    const percent = Math.max(0, Math.min(1000, Number(els.seek.value) || 0));
+    audio.currentTime = Math.max(start, Math.min(end, percent / 1000 * duration));
+    if (audio.currentTime >= end - 0.015) audio.pause();
+    updateTransport();
   });
   els.start.addEventListener('input', () => setRange(Number(els.start.value) / 1000 * duration, end));
   els.end.addEventListener('input', () => setRange(start, Number(els.end.value) / 1000 * duration));
@@ -273,7 +317,11 @@ export function initSourceClip({
   els.export.addEventListener('click', () => { void exportSource(); });
   els.reset.addEventListener('click', () => { void reset(); });
   els.preview.addEventListener('click', () => { void preview(); });
-  els.stop.addEventListener('click', () => { audio.pause(); });
+  els.stop.addEventListener('click', () => {
+    audio.pause();
+    audio.currentTime = start;
+    updateTransport();
+  });
   function pointerTime(event) {
     const rect = els.waveform.getBoundingClientRect();
     return Math.max(0, Math.min(duration, (event.clientX - rect.left) / rect.width * duration));
