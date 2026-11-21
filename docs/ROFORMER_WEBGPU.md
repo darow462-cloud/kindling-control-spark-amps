@@ -45,7 +45,7 @@ does not automatically share audio files or stems with the native app.
 - Stems now has a **Compare guitar stems · A/B** panel, visible regardless
   of the selected separation engine. Native Demucs adds the most recently
   completed guitar WAV to **A** through its existing session-scoped, validated
-  \`kindling-stem://\` read-only playback URL. A can also load a local WAV
+  `kindling-stem://` read-only playback URL. A can also load a local WAV
   manually if comparing earlier runs.
 - The embedded RoFormer workspace is intentionally isolated: to load **B**,
   export its guitar stem to a WAV and select the file explicitly. No bridge
