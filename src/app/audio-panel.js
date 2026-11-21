@@ -5,7 +5,7 @@ import {
   SPECTRUM_MIN_HZ, SPECTRUM_MAX_HZ, ANALYSIS_SECONDS,
   MAX_AUDIO_FILE_BYTES,
 } from './audio-analysis.js';
-import { generateReferencePreset } from './reference-preset.js';
+import { generateReferencePresetVariants } from './reference-preset.js';
 import { presetToJson } from '../spark/messages.js';
 
 const MAX_RECORD_SECONDS = 30;
@@ -31,6 +31,8 @@ export function initAudioPanel(
   let clockTimer = null;
   let recordingStartedAt = 0;
   let generatedPreset = null;
+  let generatedGroup = null;
+  let selectedCandidateIndex = 0;
   let applyingGenerated = false;
   const proposalUi = {
     style: $('analysis-preset-style'),
@@ -39,6 +41,8 @@ export function initAudioPanel(
     export: $('analysis-preset-export'),
     status: $('analysis-preset-status'),
     details: $('analysis-preset-details'),
+    options: $('analysis-preset-options'),
+    warnings: $('analysis-preset-warnings'),
   };
 
   function updateGeneratedPreview() {
@@ -54,32 +58,80 @@ export function initAudioPanel(
       line.textContent = note;
       proposalUi.details.append(line);
     }
+    proposalUi.warnings?.replaceChildren(
+      ...(generatedGroup?.warnings || []).map(note => {
+        const line = document.createElement('li');
+        line.textContent = note;
+        return line;
+      }),
+    );
     if (!hasReference) {
       proposalUi.status.textContent =
-        'Load a reference guitar track to generate a first-pass Spark 2 preset automatically.';
+        'Load a reference guitar track to generate four or five alternative Spark 2 presets automatically.';
     } else if (generatedPreset && !applyingGenerated) {
       const position = Number($('analysis-reference-position').value) || 0;
-      proposalUi.status.textContent = 'Suggested preset: ' + generatedPreset.preset.name +
-        ' · reference section starts at ' + fmtTime(position) +
-        ' · experimental estimate, not an exact tone clone.';
+      proposalUi.status.textContent = 'Candidate ' +
+        (selectedCandidateIndex + 1) + ' / ' + generatedGroup.candidates.length +
+        ' · ' + generatedPreset.ampLabel +
+        ' · reference starts at ' + fmtTime(position) +
+        ' · uncalibrated starting point.';
     }
   }
 
+  function renderCandidateOptions() {
+    if (!proposalUi.options) return;
+    proposalUi.options.replaceChildren();
+    const candidates = generatedGroup?.candidates || [];
+    candidates.forEach((candidate, index) => {
+      const label = document.createElement('label');
+      label.className = 'analysis-preset-option';
+      label.classList.toggle('is-selected', index === selectedCandidateIndex);
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = 'analysis-preset-candidate';
+      input.value = String(index);
+      input.checked = index === selectedCandidateIndex;
+      input.disabled = applyingGenerated;
+      const title = document.createElement('strong');
+      title.textContent = (index + 1) + '. ' + candidate.ampLabel;
+      const detail = document.createElement('small');
+      detail.textContent = candidate.label + ' · ' + candidate.style;
+      const text = document.createElement('span');
+      text.className = 'analysis-preset-option-text';
+      text.append(title, detail);
+      label.append(input, text);
+      input.addEventListener('change', () => {
+        if (!input.checked || applyingGenerated) return;
+        selectedCandidateIndex = index;
+        generatedPreset = candidates[index];
+        for (const el of proposalUi.options.querySelectorAll('.analysis-preset-option')) {
+          el.classList.toggle('is-selected', el.querySelector('input')?.checked);
+        }
+        updateGeneratedPreview();
+      });
+      proposalUi.options.append(label);
+    });
+  }
+
   function regenerateReferencePreset() {
+    generatedGroup = null;
     generatedPreset = null;
+    selectedCandidateIndex = 0;
     if (tracks.reference.profile) {
       try {
-        generatedPreset = generateReferencePreset(tracks.reference.profile, {
+        generatedGroup = generateReferencePresetVariants(tracks.reference.profile, {
           style: proposalUi.style?.value || 'auto',
           referenceName: tracks.reference.fileName || 'Reference',
         });
+        generatedPreset = generatedGroup.candidates[0];
       } catch (error) {
         if (proposalUi.status) {
-          proposalUi.status.textContent = 'Cannot generate preset: ' +
+          proposalUi.status.textContent = 'Cannot generate presets: ' +
             String(error.message || error).slice(0, 200);
         }
       }
     }
+    renderCandidateOptions();
     updateGeneratedPreview();
   }
 
@@ -483,6 +535,9 @@ export function initAudioPanel(
       proposalUi.style.disabled = !tracks.reference.profile;
       proposalUi.apply.disabled = !generatedPreset;
       proposalUi.export.disabled = !generatedPreset;
+      for (const input of proposalUi.options?.querySelectorAll('input') || []) {
+        input.disabled = false;
+      }
     }
   });
   $('analysis-mic-refresh').addEventListener('click', () => refreshInputs());
