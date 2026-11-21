@@ -1,4 +1,4 @@
-name: KindlingControl 0.7 RoFormer fast Windows Portable (verified assets)
+name: KindlingControl 0.7.1 Integrated RoFormer Windows Portable
 
 # Fast packaging after source and model-inference code were built from pinned
 # upstream code in run 44881816942 (WASM), and normalized Demucs was compiled
@@ -6,7 +6,7 @@ name: KindlingControl 0.7 RoFormer fast Windows Portable (verified assets)
 on:
   push:
     branches:
-      - feature/v0.7-roformer-webgpu-studio
+      - feature/v0.7.1-integrated-roformer-stems
     paths:
       - '.github/workflows/roformer-portable-fast.yml'
       - 'desktop/**'
@@ -46,6 +46,8 @@ jobs:
           node --check desktop/preload.cjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node --check src/app/stem-panel.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check src/app/roformer-inline.js
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       # Built from pinned Stemyla commit b2a771808d36f9a8d2f333528805d0ee2c1040a8;
@@ -122,7 +124,7 @@ jobs:
           Copy-Item $license build/bin/LICENSE.txt
           node tools/make-roformer-builder-config.js
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          node tools/stamp-version.js 0.7.0-roformer.2
+          node tools/stamp-version.js 0.7.1-integrated.1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build independent Windows Portable with two real models
@@ -130,13 +132,13 @@ jobs:
         run: >
           npx electron-builder --config build/roformer-electron-builder.json
           --win portable --x64 --publish never
-          --config.extraMetadata.version=0.7.0-roformer.2
-          --config.productName="KindlingControl RoFormer Studio 0.7 Test"
-          --config.appId=dev.darow462.kindlingcontrol.roformer07
+          --config.extraMetadata.version=0.7.1-integrated.1
+          --config.productName="KindlingControl RoFormer Integrated 0.7.1 Test"
+          --config.appId=dev.darow462.kindlingcontrol.roformer071
 
       - uses: actions/upload-artifact@v4
         with:
-          name: KindlingControl-RoFormer07-Verified-Portable-Win-x64
+          name: KindlingControl-RoFormer071-Integrated-Portable-Win-x64
           path: dist/*.exe
           if-no-files-found: error
           retention-days: 14

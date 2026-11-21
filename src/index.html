@@ -134,18 +134,36 @@
 
     <section id="panel-stems" role="tabpanel" aria-labelledby="tab-stems" hidden>
       <h2>AI track separation <small>(Windows · experimental)</small></h2>
+      <p>Choose the separation engine. RoFormer uses a different six-stem neural model and gave better results for guitar in initial listening; Demucs remains available for comparison. Processing stays on your computer.</p>
+      <div class="stem-engine-switch" role="group" aria-label="Choose separation engine">
+        <button type="button" id="stem-engine-roformer" aria-pressed="true" class="active">BS-RoFormer SW · guitar</button>
+        <button type="button" id="stem-engine-demucs" aria-pressed="false">HTDemucs · classic</button>
+      </div>
+      <section id="stem-roformer-pane" class="stem-roformer-integrated" aria-labelledby="stem-engine-roformer">
+        <div class="stem-roformer-heading">
+          <strong>BS-RoFormer SW</strong>
+          <span>GPU · six tracks · local processing</span>
+        </div>
+        <p class="hint">The first download (~350 MB) is optional and starts only when you press Download model below. The checkpoint's original license is unclear; the open-source app and model weights are separate. Solo, Mute and WAV export are inside the integrated workspace.</p>
+        <p id="stem-roformer-status" class="stem-status" role="status" aria-live="polite">The RoFormer workspace opens here when you select Stems.</p>
+        <div id="stem-roformer-frame-shell" class="stem-roformer-frame-shell">
+          <iframe id="stem-roformer-frame"
+            title="BS-RoFormer SW integrated six-track separation workspace"
+            sandbox="allow-scripts allow-same-origin allow-downloads allow-forms"
+            allow="webgpu; fullscreen"
+            referrerpolicy="no-referrer"
+            loading="lazy"
+            hidden></iframe>
+        </div>
+        <p class="hint">Your model cache and songs remain inside the RoFormer workspace. Export a guitar WAV to load it in Analyze; existing Spark amp presets are unaffected.</p>
+      </section>
+      <section id="stem-demucs-pane" class="stem-demucs-integrated" aria-labelledby="stem-engine-demucs" hidden>
       <p>Separate a song locally into <strong>drums, bass, vocals, guitar, piano and other instruments</strong> using HTDemucs 6-stem. Each result is saved as an individual WAV file that you can listen to or open in a DAW. No audio is sent to a cloud service.</p>
       <div class="stem-notice">
         <p><strong>Before the first run:</strong> Standard downloads about 84 MB of HTDemucs weights; High Quality also downloads approximately 333 MB of fine-tuned weights. Models are cached locally. Internet is needed only to fetch missing weights. A Vulkan-capable GPU is recommended.</p>
         <p><strong>Limitations:</strong> guitar separation is approximate. In dense metal mixes, overlapping guitars, cymbals, vocals and distorted bass may bleed into other tracks. The six outputs are instrument categories, not guaranteed individual musicians or overdubs.</p>
       </div>
-      <section class="stem-roformer-studio" aria-labelledby="stem-roformer-title">
-        <h3 id="stem-roformer-title">Try another AI model: BS-RoFormer SW</h3>
-        <p>Experimental local WebGPU separation with a different model, including guitar, drums, bass, vocals, piano and other instruments. This is a separate studio inside KindlingControl: compare its guitar stem with Demucs and export WAV for Analyze.</p>
-        <p class="hint">First use requires an explicit model download (~350 MB, kept on this computer). The open-source inference app is packaged locally; the independently trained model weights are not bundled and have no clearly stated upstream license. Only download them if you accept those terms. GPU support and audio quality must be tested on your Windows system.</p>
-        <button type="button" id="stem-open-roformer" class="primary">Open RoFormer studio…</button>
-        <p id="stem-roformer-status" role="status" aria-live="polite" class="stem-status"></p>
-      </section>
+
       <div id="stem-support-warning" class="banner" hidden>Native stem separation is currently provided only in the dedicated Windows Portable build. This browser/mobile build can still import an already separated WAV file into Analyze.</div>
       <div class="stem-form">
         <div class="stem-settings">
@@ -185,6 +203,7 @@
           <button type="button" id="stem-analyze-guitar">Analyze guitar stem</button>
         </div>
       </div>
+      </section>
     </section>
 
     <section id="panel-analysis" role="tabpanel" aria-labelledby="tab-analysis" hidden>

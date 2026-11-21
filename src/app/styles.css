@@ -912,20 +912,85 @@ dialog.help-dialog[open] { display: flex; }
 }
 .stem-settings .hint { font-size: 0.8rem; color: var(--muted); max-width: 80ch; margin: 0 0 0.25rem; }
 
-/* 0.7 experimental: real GPU RoFormer alternative, entirely separate from
-   the Demucs six-stem panel and Spark amp Bluetooth transport. */
-.stem-roformer-studio {
-  display: grid;
-  justify-items: start;
-  gap: 0.5rem;
-  margin: 1rem 0;
-  padding: 1rem;
+/* 0.7.1: Model switching happens directly in Stems, not a second window. */
+.stem-engine-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 1rem 0 0.9rem;
+  padding: 0.25rem;
+  max-width: 740px;
   border: 1px solid var(--border);
-  border-radius: 0.85rem;
-  background: var(--surface);
+  border-radius: 0.75rem;
+  background: var(--bg-2);
 }
-.stem-roformer-studio h3 { margin: 0; font-size: 1rem; }
-.stem-roformer-studio p { margin: 0; color: var(--muted); max-width: 80ch; line-height: 1.5; font-size: 0.85rem; }
-.stem-roformer-studio .hint { font-size: 0.78rem; }
-.stem-roformer-studio button { margin-top: 0.35rem; }
-.stem-roformer-studio .stem-status { font-size: 0.8rem; overflow-wrap: anywhere; }
+.stem-engine-switch button {
+  flex: 1 1 210px;
+  margin: 0;
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.6rem;
+  border: 1px solid transparent;
+  color: var(--muted);
+  font-weight: 650;
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+}
+.stem-engine-switch button.active,
+.stem-engine-switch button[aria-pressed="true"] {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+.stem-engine-switch button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.stem-roformer-integrated {
+  display: grid;
+  gap: 0.65rem;
+  min-width: 0;
+}
+.stem-roformer-integrated[hidden],
+.stem-demucs-integrated[hidden] { display: none !important; }
+.stem-roformer-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: 1rem;
+  row-gap: 0.2rem;
+  font-size: 0.9rem;
+}
+.stem-roformer-heading span { font-size: 0.78rem; color: var(--muted); }
+.stem-roformer-integrated .hint {
+  font-size: 0.79rem;
+  color: var(--muted);
+  margin: 0;
+  max-width: 95ch;
+  line-height: 1.5;
+}
+.stem-roformer-integrated .stem-status {
+  margin: 0;
+  font-size: 0.83rem;
+  min-height: 1.3rem;
+}
+.stem-roformer-frame-shell {
+  width: 100%;
+  height: min(75vh, 980px);
+  min-height: 540px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  background: #1b1b1b;
+}
+#stem-roformer-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #1b1b1b;
+}
+#stem-roformer-frame[hidden] { display: none; }
+@media (max-width: 680px) {
+  .stem-engine-switch { flex-wrap: nowrap; }
+  .stem-engine-switch button { flex: 1 1 0; font-size: 0.78rem; padding: 0.5rem 0.3rem; }
+  .stem-roformer-frame-shell { min-height: 480px; height: 72vh; }
+}

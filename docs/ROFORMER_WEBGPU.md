@@ -1,4 +1,4 @@
-# Experimental BS-RoFormer SW WebGPU studio (KindlingControl 0.7)
+# Experimental BS-RoFormer SW WebGPU studio (KindlingControl 0.7.1 inline)
 
 This is an **optional, independently implemented separator**, not a filter or
 postprocessor on Demucs outputs. The goal is to give users a different neural
@@ -21,8 +21,8 @@ model for comparison when Demucs guitar is muffled or bleeds into other stems.
 
 ## User workflow
 
-1. Open **Stems → Open RoFormer studio…** in the experimental Windows Portable.
-2. Inside the separate studio window, click **Download model** if you accept
+1. Open **Stems → BS-RoFormer SW · guitar** in the experimental Windows Portable. The RoFormer workspace opens within the existing tab, without a new window.
+2. Inside the embedded workspace, click **Download model** if you accept
    the checkpoint terms (internet required only for that initial download).
 3. Open your source song. Separate into 6 stems.
 4. Solo the guitar lane to compare with the Demucs output and listen for lost
@@ -33,7 +33,7 @@ model for comparison when Demucs guitar is muffled or bleeds into other stems.
 
 No user audio is uploaded to a hosted inference service; inference runs in
 WebGPU on the user's own device. First use does require an explicit weight
-download. Stemyla runs as a separate UI in a sandboxed Electron window with
+download. Stemyla runs as a self-contained UI embedded in the main Stems tab via a sandboxed cross-origin iframe with
 its own secure `kindling-roformer://studio/` origin. It has **no Node
 integration, Electron preload, Bluetooth access, or automatic model download**.
 Only statically packaged files can be served by that scheme. Model and song
@@ -42,16 +42,14 @@ does not automatically share audio files or stems with the native app.
 
 ## Technical boundaries
 
-- `desktop/main.js` launches the packaged studio only via a trusted main
-  app IPC `roformer:open`. The renderer cannot supply file paths, CLI args,
-  web URLs, executable names or a process to launch.
+- `desktop/main.js` exposes only `roformer:status` via a trusted main-app IPC, returning a fixed local URL and package availability. The renderer cannot supply file paths, CLI args, executable names or a process to launch, and no second BrowserWindow is created. `src/app/roformer-inline.js` lazy-loads the sandboxed iframe only when Stems is selected, delegates WebGPU through `allow=webgpu`, and preserves the same loaded iframe when switching back from Demucs.
 - `desktop/roformer-studio.js` resolves each request against the real
   packaged resource folder and rejects symlink traversal, other hosts and
   missing files; it serves proper WASM and JavaScript MIME types.
 - In production the resources are under
   `process.resourcesPath/roformer-studio`. The app/worker/decoder/writer
   WebAssembly modules are packaged together; **no model checkpoints**.
-- The separate studio can export its own WAVs through Chromium's file
+- The embedded studio can export its own WAVs through Chromium's file
   download capability. The existing KindlingControl Analyze tab accepts
   a user-selected WAV as reference.
 - No modification to the accepted Spark BLE command path, Undo/Redo, A/B,
@@ -71,7 +69,7 @@ does not automatically share audio files or stems with the native app.
   and model can use significant video memory. Use a short 20–30s clip first.
 - Unlike the native six-stem output, exported RoFormer WAVs are not yet
   automatically loaded into Analyze; import through its file picker.
-- The studio is an independently built upstream UI, not an original UI design
+- The embedded studio remains an independently built upstream UI within the Stems panel, not an original UI design
   or a silent bundled replacement. Both license credits and a source link
   must remain visible.
 
