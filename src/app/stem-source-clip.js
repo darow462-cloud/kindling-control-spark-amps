@@ -4,7 +4,7 @@
 // and RoFormer receives a user-selected File through its existing bridge.
 import {
   clipIsFull, durationClock, MAX_SOURCE_DECODE_BYTES, MAX_CLIP_SECONDS,
-  peakEnvelope, wavFromAudioBuffer,
+  peakEnvelope, wavFromAudioBuffer, triggerDownload,
 } from './stem-trim-utils.js';
 
 export function initSourceClip({
@@ -15,6 +15,7 @@ export function initSourceClip({
   onRoFormerRestore = async () => {},
   windowRef = window,
   urlApi = URL,
+  download = triggerDownload,
 } = {}) {
   if (!root) return null;
   const $ = (id) => root.querySelector('#' + id);
@@ -23,7 +24,8 @@ export function initSourceClip({
     waveform: $('stem-source-waveform'), start: $('stem-source-start'),
     end: $('stem-source-end'), startNum: $('stem-source-start-number'),
     endNum: $('stem-source-end-number'), duration: $('stem-source-duration'),
-    apply: $('stem-source-apply'), reset: $('stem-source-reset'),
+    apply: $('stem-source-apply'), export: $('stem-source-export'),
+    reset: $('stem-source-reset'),
     preview: $('stem-source-preview'), stop: $('stem-source-preview-stop'),
   };
   if (!Object.values(els).every(Boolean)) return null;
@@ -66,6 +68,7 @@ export function initSourceClip({
     els.preview.disabled = !source || !duration || busy;
     els.stop.disabled = !source;
     els.apply.disabled = !loaded || !isTrimmed() || busy || isApplied();
+    els.export.disabled = !loaded || !isTrimmed() || busy;
     els.reset.disabled = !source || busy || (!isTrimmed() && !applied);
     els.name.textContent = source ? source.name + ' · ' +
       (source.engine === 'demucs' ? 'Demucs' : 'RoFormer') : 'Choose an audio file in either engine';
@@ -214,6 +217,23 @@ export function initSourceClip({
       refresh();
     }
   }
+  async function exportSource() {
+    if (disposed || !source || !loaded || !isTrimmed() || busy) return false;
+    busy = true;
+    refresh();
+    try {
+      const clip = wavFromAudioBuffer(decoded, start, end);
+      download(clip, source.engine + '-source-clip.wav', {
+        documentRef: windowRef.document, urlApi,
+      });
+      say('Trimmed source WAV exported. The original is unchanged.', 'success');
+      return true;
+    } catch (error) {
+      say('Could not export source clip: ' +
+        String(error.message || error).slice(0, 180), 'error');
+      return false;
+    } finally { busy = false; refresh(); }
+  }
   async function reset() {
     if (disposed || !source || busy) return;
     audio.pause();
@@ -250,6 +270,7 @@ export function initSourceClip({
   els.startNum.addEventListener('change', () => setRange(Number(els.startNum.value), end));
   els.endNum.addEventListener('change', () => setRange(start, Number(els.endNum.value)));
   els.apply.addEventListener('click', () => { void apply(); });
+  els.export.addEventListener('click', () => { void exportSource(); });
   els.reset.addEventListener('click', () => { void reset(); });
   els.preview.addEventListener('click', () => { void preview(); });
   els.stop.addEventListener('click', () => { audio.pause(); });
