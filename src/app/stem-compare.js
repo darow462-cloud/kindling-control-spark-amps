@@ -170,6 +170,12 @@ export function initStemCompare({
       setSource('a', stem.url, 'Guitar (latest Demucs)', false);
       return true;
     },
+    setRoFormer(file) {
+      if (!isLocalWav(file)) return false;
+      const url = urlApi.createObjectURL(file);
+      setSource('b', url, file.name, true);
+      return true;
+    },
     pause() {
       for (const player of Object.values(players)) player.pause();
       refresh();
