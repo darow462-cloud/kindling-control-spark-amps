@@ -86,6 +86,43 @@ does not automatically share audio files or stems with the native app.
   normalized output; play at moderate volume to prevent overload.
 - The independent 0.7.2 guitar A/B listening panel remains available.
 
+## Direct in-app OPFS stem transfer (0.7.4 experiment)
+
+The bundled Stemyla source (pinned to commit
+`b2a771808d36f9a8d2f333528805d0ee2c1040a8`) already stores
+completed 16-bit WAV stems in its own private origin storage:
+`sessions/current` names the current numeric session;
+`sessions/<id>/meta` lists complete `stem` lines; and
+`sessions/<id>/stems/<stem>.wav` contains the finished 16-bit WAV
+files. The upstream app also has a separate memory-only fallback
+when browser storage fails.
+
+- The Windows packaging step `tools/install-roformer-transfer.js` adds
+  `desktop/roformer-transfer-bridge.js` as a **KindlingControl-owned
+  JavaScript companion** to the exact pinned Stemyla built assets. The
+  pinned WASM files and their model/inference code are untouched. No model
+  weights are bundled or downloaded automatically.
+- The user clicks **Import directly from RoFormer** in Stems. The host
+  `src/app/roformer-transfer.js` sends a one-time nonce to the exact
+  loaded iframe. The child validates the embedding parent and reads
+  **only** the current session's listed six stem WAVs. It validates
+  completion and WAV headers, then replies with structured-cloned File
+  objects (no network upload, native filesystem access, or browser download).
+- The host requires the exact iframe window, matching nonce, a known
+  RoFormer origin (or opaque custom-scheme origin), fixed stem names,
+  Blob/File objects and bounded sizes (256 MB per file, 1 GB total).
+  An invalid reply fails closed. The files enter the existing RoFormer
+  mixer bank through explicit Blob URLs; no new Electron IPC, Bluetooth,
+  subprocess or arbitrary path bridge is added.
+- This is a **one-click local transfer after separation**, not a
+  background model manager or an automatic RoFormer start. If the
+  current session has no completed OPFS stems, direct transfer refuses
+  and the existing manual WAV import remains available.
+- Verify in the target Electron/Windows build that the custom scheme
+  supports cross-origin `postMessage`, that OPFS File objects can be
+  structured-cloned between frames, and that a real six-stem run loads
+  all six WAVs. Unit tests cannot prove this GPU/browser integration.
+
 ## Technical boundaries
 
 - `desktop/main.js` exposes only `roformer:status` via a trusted main-app IPC, returning a fixed local URL and package availability. The renderer cannot supply file paths, CLI args, executable names or a process to launch, and no second BrowserWindow is created. `src/app/roformer-inline.js` lazy-loads the sandboxed iframe only when Stems is selected, delegates WebGPU through `allow=webgpu`, and preserves the same loaded iframe when switching back from Demucs.
