@@ -1,0 +1,173 @@
+name: KindlingControl 0.7.9 Playback Seek Windows Portable
+
+# Fast packaging using the successfully built v0.7.6 pinned Rust/WASM
+# app from run 44890993071 (artifact sha256:b0dac2e4e8cf0de3f6eed38575c28f88b885c547510be6406d90ad5a6678b626),
+# and normalized Demucs was compiled
+# in run 44856514299. Neither upstream weights nor audio are redistributed.
+on:
+  push:
+    branches:
+      - feature/v0.7.9-playback-seek
+    paths:
+      - '.github/workflows/roformer-playback-portable.yml'
+      - 'desktop/**'
+      - 'src/**'
+      - 'test/**'
+      - 'tools/make-roformer-builder-config.js'
+      - 'tools/install-roformer-transfer.js'
+      - 'src/app/roformer-health.js'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  verified-portable:
+    name: Bundle pinned WASM, SHA-verified normalized Demucs, and KindlingControl
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install and run app/IPC/security regression tests
+        shell: pwsh
+        run: |
+          npm ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check desktop/main.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check desktop/roformer-studio.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check desktop/preload.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check src/app/stem-panel.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check src/app/roformer-inline.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check src/app/stem-compare.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check src/app/stem-mixer.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check src/app/audio-panel.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check src/app/roformer-transfer.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check src/app/roformer-health.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check src/app/stem-trim-utils.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check src/app/stem-source-clip.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check src/app/stem-export-clip.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check desktop/stem-clip-store.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check desktop/roformer-transfer-bridge.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check tools/install-roformer-transfer.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # Reuse the successfully built pinned WASM from v0.7.6 (run 44890993071).
+      # Its Rust separation and completion logic are unchanged in 0.7.7.
+      # GitHub Actions verifies the artifact digest on download.
+      - uses: actions/download-artifact@v4
+        with:
+          repository: darow462-cloud/kindling-control-spark-amps
+          run-id: 44890993071
+          name: roformer-auto-webgpu-assets
+          github-token: ${{ github.token }}
+          path: build/roformer-package
+
+      # Source-built normalized Demucs from pinned demucs-rs v0.3.5 and the
+      # tested 0.6.2 global-normalizer patch. Its published Portable is an
+      # embedded 7z SFX archive containing resources/demucs/demucs.exe.
+      - uses: actions/download-artifact@v4
+        with:
+          repository: darow462-cloud/kindling-control-spark-amps
+          run-id: 44856514299
+          name: KindlingControl-Stems062-GlobalNorm-Win-x64
+          github-token: ${{ github.token }}
+          path: build/normalized062
+
+      - name: Verify independent WASM workers and extract the pinned native engine
+        shell: pwsh
+        run: |
+          Move-Item build/roformer-package/studio build/roformer-studio
+          Move-Item build/roformer-package/notices build/roformer-notices
+          # Add a KindlingControl-owned read-only OPFS bridge to the pinned
+          # Stemyla HTML. Never change pinned WASM or redistribute weights.
+          node tools/install-roformer-transfer.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $wasm = @(Get-ChildItem build/roformer-studio -Recurse -Filter *.wasm -File)
+          if ($wasm.Count -ne 4) { throw "Expected 4 pinned WASM modules, got $($wasm.Count)" }
+          $portable = @(Get-ChildItem build/normalized062 -Recurse -Filter *.exe -File)
+          if ($portable.Count -ne 1) { throw "Expected exactly one 0.6.2 Portable EXE" }
+          $seven = "C:\Program Files\7-Zip\7z.exe"
+          if (!(Test-Path $seven)) { throw "7-Zip is missing from Windows runner" }
+          $destination = Join-Path $PWD "build/normalized-extracted"
+          New-Item -ItemType Directory -Force -Path $destination | Out-Null
+          # The Electron Portable EXE is an NSIS wrapper around an embedded
+          # genuine 7z payload. 7-Zip treats the wrapper as NSIS and hides
+          # nested resource names; extract the verified payload first.
+          $bytes = [System.IO.File]::ReadAllBytes($portable[0].FullName)
+          $signature = [byte[]]@(0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c)
+          $offset = 0
+          $start = -1
+          while ($offset -lt $bytes.Length - 6) {
+            $candidate = [Array]::IndexOf($bytes, [byte]0x37, $offset)
+            if ($candidate -lt 0) { break }
+            if ($bytes[$candidate + 1] -eq $signature[1] -and
+                $bytes[$candidate + 2] -eq $signature[2] -and
+                $bytes[$candidate + 3] -eq $signature[3] -and
+                $bytes[$candidate + 4] -eq $signature[4] -and
+                $bytes[$candidate + 5] -eq $signature[5]) {
+              $start = $candidate
+              break
+            }
+            $offset = $candidate + 1
+          }
+          if ($start -lt 0) { throw "Embedded 7z payload not found" }
+          $payload = Join-Path $destination "verified-normalized-062.7z"
+          $writer = [System.IO.File]::Create($payload)
+          try { $writer.Write($bytes, $start, $bytes.Length - $start) }
+          finally { $writer.Dispose() }
+          & $seven x $payload "-o$destination" "resources/demucs/demucs.exe" "resources/demucs/LICENSE.txt" -y
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $native = Join-Path $destination "resources/demucs/demucs.exe"
+          $license = Join-Path $destination "resources/demucs/LICENSE.txt"
+          if (!(Test-Path $native) -or !(Test-Path $license)) { throw "Normalized native engine missing from verified Portable" }
+          $hash = (Get-FileHash $native -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($hash -ne "4bb4d08b86861dd0146de283d20b0539856a186b07345b1f7e619dbf9b6fee95") {
+            throw "Normalized Demucs SHA256 mismatch: $hash"
+          }
+          New-Item -ItemType Directory -Force -Path build/bin | Out-Null
+          Copy-Item $native build/bin/demucs.exe
+          Copy-Item $license build/bin/LICENSE.txt
+          node tools/make-roformer-builder-config.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node tools/stamp-version.js 0.7.9-seek.1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build independent Windows Portable with two real models
+        shell: pwsh
+        run: >
+          npx electron-builder --config build/roformer-electron-builder.json
+          --win portable --x64 --publish never
+          --config.extraMetadata.version=0.7.9-seek.1
+          --config.productName="KindlingControl Playback Seek 0.7.9 Test"
+          --config.appId=dev.darow462.kindlingcontrol.roformer079seek
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KindlingControl-Playback079-Seek-Portable-Win-x64
+          path: dist/*.exe
+          if-no-files-found: error
+          retention-days: 14
