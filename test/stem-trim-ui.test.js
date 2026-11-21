@@ -31,10 +31,15 @@ class Fake {
     fillRect(){},clearRect(){},beginPath(){},moveTo(){},lineTo(){},stroke(){}};}
 }
 class FakeAudio extends Fake {
-  pause(){this.paused=true;}
+  constructor() {
+    super();
+    this.paused = true;
+    this.currentTime = 0;
+  }
+  pause(){this.paused=true;this.fire('pause');}
   load(){}
   removeAttribute(){}
-  play(){this.paused=false;return Promise.resolve();}
+  play(){this.paused=false;this.fire('play');return Promise.resolve();}
 }
 const data=()=>{
   const channels=2;
@@ -66,12 +71,15 @@ test('source editor blocks unapplied range and stages/clears Demucs temporary cl
     'stem-source-start','stem-source-end','stem-source-start-number',
     'stem-source-end-number','stem-source-duration','stem-source-apply',
     'stem-source-reset','stem-source-export','stem-source-preview','stem-source-preview-stop',
+    'stem-source-seek','stem-source-playback-clock',
   ]);
   const events=[];
   const downloads=[];
   let seq=0;
+  const sourceAudio = new FakeAudio();
+  const doc = { createElement: (tag) => tag === 'audio' ? sourceAudio : new Fake() };
   const editor=initSourceClip({
-    root, windowRef:{document:fakeDoc(),AudioContext:ctxClass},
+    root, windowRef:{document:doc,AudioContext:ctxClass},
     urlApi:{createObjectURL:()=> 'blob:source/'+(++seq),revokeObjectURL(){}},
     download:(blob,name)=>downloads.push({blob,name}),
     onDemucsApply:async(blob)=>events.push({type:'apply',blob}),
@@ -83,11 +91,39 @@ test('source editor blocks unapplied range and stages/clears Demucs temporary cl
   assert.equal(await editor.loadSource({engine:'demucs',file:source}),true);
   assert.equal(root.hidden,false);
   assert.equal(editor.canSeparate('demucs'),true);
+  assert.equal(elements['stem-source-seek'].disabled,false);
+  assert.equal(elements['stem-source-playback-clock'].textContent,'0:00.00 / 0:02.00');
+  elements['stem-source-seek'].value='500';
+  elements['stem-source-seek'].fire('input');
+  assert.equal(sourceAudio.currentTime,1);
+  assert.equal(elements['stem-source-playback-clock'].textContent,'0:01.00 / 0:02.00');
   elements['stem-source-start-number'].value='0.20';
   elements['stem-source-start-number'].fire('change');
   elements['stem-source-end-number'].value='1.20';
   elements['stem-source-end-number'].fire('change');
   assert.equal(editor.canSeparate('demucs'),false);
+  // Seeking past the selected end clamps to the trim, without editing it.
+  elements['stem-source-seek'].value='900';
+  elements['stem-source-seek'].fire('input');
+  assert.equal(sourceAudio.currentTime,1.2);
+  elements['stem-source-preview'].click();
+  await wait();
+  assert.equal(sourceAudio.paused,false);
+  assert.equal(sourceAudio.currentTime,0.2,'play from start when cursor is at end');
+  sourceAudio.currentTime=0.65;
+  sourceAudio.fire('timeupdate');
+  assert.equal(elements['stem-source-playback-clock'].textContent,'0:00.65 / 0:02.00');
+  elements['stem-source-preview'].click();
+  assert.equal(sourceAudio.paused,true,'button toggles pause');
+  elements['stem-source-preview'].click();
+  await wait();
+  assert.equal(sourceAudio.currentTime,0.65,'play resumes where it was paused');
+  sourceAudio.currentTime=1.2;
+  sourceAudio.fire('timeupdate');
+  assert.equal(sourceAudio.paused,true,'stop at selected end');
+  assert.equal(elements['stem-source-seek'].value,'600');
+  elements['stem-source-preview-stop'].click();
+  assert.equal(sourceAudio.currentTime,0.2,'stop returns to selection start');
   elements['stem-source-export'].click();
   await wait();
   assert.equal(downloads.length,1);
@@ -122,10 +158,30 @@ test('six-stem editor previews the same selected interval and exports WAVs in a 
     'stem-mixer-clips-start-number','stem-mixer-clips-end-number',
     'stem-mixer-clips-export','stem-mixer-clips-preview',
     'stem-mixer-clips-status','stem-mixer-clips-selected',
-    'stem-mixer-clips-waveforms',
+    'stem-mixer-clips-waveforms','stem-mixer-clips-seek',
+    'stem-mixer-clips-playback-clock',
   ]);
-  const previews=[],downloads=[];
-  const mixer={previewRange:(start,end)=>{previews.push([start,end]);return true;}};
+  const previews=[],downloads=[],seeks=[];
+  const listeners = new Set();
+  const mixer = {
+    time:0,playing:false,
+    snapshot(){ return {time:this.time,duration:2,playing:this.playing,mode:'demucs'}; },
+    emit(){ for(const callback of listeners)callback(this.snapshot()); },
+    subscribeTransport(callback) {
+      listeners.add(callback);
+      callback(this.snapshot());
+      return () => listeners.delete(callback);
+    },
+    getPosition(){return this.time;},
+    isPlaying(){return this.playing;},
+    seekTo(time){this.time=time;seeks.push(time);this.emit();return true;},
+    previewRange(start,end,from=start){
+      previews.push([start,end]);
+      this.playing=true;this.time=from;this.emit();
+      return true;
+    },
+    pause(){this.playing=false;this.emit();},
+  };
   const sources=['drums','bass','vocals','guitar','piano','other'].map(name=>({
     name,url:'kindling-stem://550e8400-e29b-41d4-a716-446655440000/'+name+'.wav',
   }));
@@ -147,6 +203,8 @@ test('six-stem editor previews the same selected interval and exports WAVs in a 
   await wait();
   assert.match(elements['stem-mixer-clips-status'].textContent,/All six waveforms ready/);
   assert.equal(elements['stem-mixer-clips-export'].disabled,false);
+  assert.equal(elements['stem-mixer-clips-seek'].disabled,false);
+  assert.equal(elements['stem-mixer-clips-playback-clock'].textContent,'0:00.00 / 0:02.00');
   assert.equal(elements['stem-mixer-clips-waveforms'].children.length,6);
   elements['stem-mixer-clips-start-number'].value='0.25';
   elements['stem-mixer-clips-start-number'].fire('change');
@@ -154,6 +212,18 @@ test('six-stem editor previews the same selected interval and exports WAVs in a 
   elements['stem-mixer-clips-end-number'].fire('change');
   elements['stem-mixer-clips-preview'].click();
   assert.deepEqual(previews,[[0.25,1.25]]);
+  assert.equal(elements['stem-mixer-clips-preview'].textContent,'Pause selected mix');
+  elements['stem-mixer-clips-seek'].value='500';
+  elements['stem-mixer-clips-seek'].fire('input');
+  assert.equal(seeks.at(-1),1);
+  assert.equal(elements['stem-mixer-clips-playback-clock'].textContent,'0:01.00 / 0:02.00');
+  assert.equal(mixer.playing,true,'scrubbing does not pause all stem players');
+  elements['stem-mixer-clips-preview'].click();
+  assert.equal(mixer.playing,false);
+  elements['stem-mixer-clips-preview'].click();
+  assert.equal(mixer.playing,true);
+  assert.equal(mixer.time,1,'resume from scrubbed time');
+  assert.equal(previews.length,2);
   elements['stem-mixer-clips-export'].click();
   await wait();
   assert.equal(downloads.length,1);
