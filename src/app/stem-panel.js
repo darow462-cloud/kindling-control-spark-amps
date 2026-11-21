@@ -155,6 +155,25 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
       ? 'Runs two models: fine-tuned drums/bass/vocals; six-stem guitar/piano/other. This can improve some instruments but will be much slower and is not guaranteed to fix artifacts.'
       : 'Uses the existing 6-stem model for every track. Faster, less GPU time.';
   });
+  const openRoformer = $('stem-open-roformer');
+  openRoformer.disabled = typeof window.kindlingDesktop?.roformer?.openStudio !== 'function';
+  if (openRoformer.disabled) {
+    $('stem-roformer-status').textContent = 'WebGPU studio is available in the dedicated Windows Portable build.';
+  }
+  openRoformer.addEventListener('click', async () => {
+    if (openRoformer.disabled) return;
+    openRoformer.disabled = true;
+    const notice = $('stem-roformer-status');
+    notice.textContent = 'Opening a local GPU studio…';
+    try {
+      await window.kindlingDesktop.roformer.openStudio();
+      notice.textContent = 'Studio opened. Download model inside it only when you choose; save the guitar WAV to compare in Analyze.';
+    } catch (err) {
+      notice.textContent = `Could not open RoFormer studio: ${err.message}`;
+    } finally {
+      openRoformer.disabled = false;
+    }
+  });
   $('stem-select-file').addEventListener('click', () => choose('file'));
   $('stem-select-output').addEventListener('click', () => choose('output'));
   $('stem-start').addEventListener('click', start);
