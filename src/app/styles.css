@@ -1197,3 +1197,31 @@ dialog.help-dialog[open] { display: flex; }
   .stem-roformer-native-controls { padding: 0.7rem; }
   .stem-roformer-control-bar button { width: 100%; }
 }
+
+
+/* ---- 0.7.6: first-party RoFormer UI, Advanced Studio as optional fold ------- */
+.stem-roformer-advanced-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  padding-block: 0.4rem;
+}
+.stem-roformer-advanced-toolbar button {
+  font-weight: 600;
+}
+.stem-roformer-frame-shell:not(.expanded) {
+  /* Keep the iframe laid out with a real canvas viewport and a tiny
+     visible intersection, so the model worker and Rust state updates can
+     continue while the duplicate workspace is out of the user's way. */
+  height: 2px;
+  min-height: 2px;
+  border: 0;
+  overflow: hidden;
+}
+.stem-roformer-frame-shell:not(.expanded) #stem-roformer-frame {
+  width: 100%;
+  height: min(75vh, 980px);
+  min-height: 540px;
+  pointer-events: none;
+}
