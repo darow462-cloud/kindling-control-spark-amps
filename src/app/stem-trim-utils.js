@@ -21,10 +21,10 @@ export function clipIsFull(range, duration) {
 }
 
 export function durationClock(seconds) {
-  const value = Math.max(0, Number.isFinite(seconds) ? seconds : 0);
-  const whole = Math.floor(value);
-  return Math.floor(whole / 60) + ':' + String(whole % 60).padStart(2, '0') +
-    '.' + String(Math.round((value - whole) * 100)).padStart(2, '0').slice(-2);
+  const cents = Math.round(Math.max(0, Number.isFinite(seconds) ? seconds : 0) * 100);
+  return Math.floor(cents / 6000) + ':' +
+    String(Math.floor(cents % 6000 / 100)).padStart(2, '0') + '.' +
+    String(cents % 100).padStart(2, '0');
 }
 
 export function peakEnvelope(buffer, bins = 260) {
