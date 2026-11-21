@@ -68,10 +68,12 @@ test('source editor blocks unapplied range and stages/clears Demucs temporary cl
     'stem-source-reset','stem-source-export','stem-source-preview','stem-source-preview-stop',
   ]);
   const events=[];
+  const downloads=[];
   let seq=0;
   const editor=initSourceClip({
     root, windowRef:{document:fakeDoc(),AudioContext:ctxClass},
     urlApi:{createObjectURL:()=> 'blob:source/'+(++seq),revokeObjectURL(){}},
+    download:(blob,name)=>downloads.push({blob,name}),
     onDemucsApply:async(blob)=>events.push({type:'apply',blob}),
     onDemucsRestore:async()=>events.push({type:'restore'}),
     onRoFormerApply:async()=>events.push({type:'roformer'}),
@@ -86,6 +88,12 @@ test('source editor blocks unapplied range and stages/clears Demucs temporary cl
   elements['stem-source-end-number'].value='1.20';
   elements['stem-source-end-number'].fire('change');
   assert.equal(editor.canSeparate('demucs'),false);
+  elements['stem-source-export'].click();
+  await wait();
+  assert.equal(downloads.length,1);
+  assert.equal(downloads[0].name,'demucs-source-clip.wav');
+  assert.equal(downloads[0].blob.type,'audio/wav');
+  assert.equal(editor.canSeparate('demucs'),false,'exporting does not silently apply the clip');
   elements['stem-source-apply'].click();
   await wait();
   assert.equal(events.length,1);
