@@ -1428,3 +1428,50 @@ dialog.help-dialog[open] { display: flex; }
   .analysis-preset-toolbar { align-items: stretch; }
   .analysis-preset-toolbar label, .analysis-preset-toolbar button { width: 100%; }
 }
+
+
+/* 0.8.1: candidate reference-only Spark 2 tones */
+.analysis-preset-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 215px), 1fr));
+  gap: .55rem;
+}
+.analysis-preset-option {
+  display: flex;
+  gap: .6rem;
+  align-items: flex-start;
+  min-width: 0;
+  border: 1px solid var(--border, #4a4b55);
+  border-radius: .65rem;
+  padding: .7rem .75rem;
+  cursor: pointer;
+  background: rgba(120, 125, 145, .08);
+}
+.analysis-preset-option:hover, .analysis-preset-option:focus-within {
+  border-color: #c6a06b;
+}
+.analysis-preset-option.is-selected {
+  border-color: #daa767;
+  background: rgba(218, 167, 103, .13);
+}
+.analysis-preset-option input {
+  flex: 0 0 auto;
+  accent-color: #d4a16d;
+  margin-top: .25rem;
+}
+.analysis-preset-option-text {
+  min-width: 0;
+  display: grid;
+  gap: .3rem;
+}
+.analysis-preset-option-text strong {
+  overflow-wrap: anywhere;
+}
+.analysis-preset-option-text small {
+  opacity: .8;
+  line-height: 1.45;
+}
+.analysis-preset-generator .analysis-preset-warnings-title {
+  margin: .3rem 0 0;
+  font-size: .9rem;
+}
