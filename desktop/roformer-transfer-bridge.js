@@ -97,6 +97,8 @@
   const COMMAND = 'kindling.roformer.control.command.v1';
   const ACK = 'kindling.roformer.control.ack.v1';
   const STATE = 'kindling.roformer.control.state.v1';
+  const HEALTH_REQUEST = 'kindling.roformer.health.request.v1';
+  const HEALTH_RESULT = 'kindling.roformer.health.result.v1';
   const SOURCE_AUDIO = /\.(wav|aiff|aif|flac|mp3|ogg|m4a|aac)$/i;
   window.__kindlingControl = {
     available: true,
@@ -159,6 +161,28 @@
     } else {
       controlQueue.push({ action: data.action, nonce: data.nonce });
     }
+  });
+
+  // On-demand, read-only feature probe. Do not enumerate OPFS files,
+  // song names, model caches, user paths or browser/GPU identifiers.
+  window.addEventListener('message', (event) => {
+    if (window.parent === window || event.source !== window.parent ||
+        !['kindling://app', 'null'].includes(event.origin)) return;
+    const data = event.data;
+    if (!data || data.type !== HEALTH_REQUEST ||
+        typeof data.nonce !== 'string' ||
+        !/^[a-zA-Z0-9-]{16,80}$/.test(data.nonce)) return;
+    window.parent.postMessage({
+      type: HEALTH_RESULT,
+      nonce: data.nonce,
+      health: {
+        bridge: !!window.__kindlingControl?.available,
+        nativeReports: lastStateSent > -Infinity,
+        webgpuApi: !!navigator.gpu,
+        opfsApi: typeof navigator.storage?.getDirectory === 'function',
+        studioCanvas: !!document.getElementById('stem_explorer'),
+      },
+    }, '*');
   });
 
   window.addEventListener('message', async (event) => {
