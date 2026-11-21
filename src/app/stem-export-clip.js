@@ -24,6 +24,8 @@ export function initStemExportClip({
     endNum: $('stem-mixer-clips-end-number'),
     export: $('stem-mixer-clips-export'),
     preview: $('stem-mixer-clips-preview'),
+    seek: $('stem-mixer-clips-seek'),
+    playbackClock: $('stem-mixer-clips-playback-clock'),
     status: $('stem-mixer-clips-status'),
     selected: $('stem-mixer-clips-selected'),
     lanes: $('stem-mixer-clips-waveforms'),
@@ -39,6 +41,20 @@ export function initStemExportClip({
   let epoch = 0;
   let disposed = false;
   const canvases = new Map();
+  let transport = { time: 0, duration: 0, playing: false, mode: '' };
+  let unsubscribeTransport = () => {};
+  function updateTransport(next = transport) {
+    if (disposed) return;
+    transport = next;
+    const time = transport.mode === current.mode && Number.isFinite(transport.time)
+      ? Math.max(0, Math.min(duration, transport.time)) : 0;
+    elements.seek.disabled = !duration || busy;
+    elements.seek.value = duration ? String(Math.round(time / duration * 1000)) : '0';
+    elements.playbackClock.textContent = durationClock(time) + ' / ' + durationClock(duration);
+    elements.preview.textContent = transport.playing && transport.mode === current.mode
+      ? 'Pause selected mix' : 'Play selection';
+    draw();
+  }
 
   function say(message, error = false) {
     if (disposed) return;
@@ -70,6 +86,13 @@ export function initStemExportClip({
       for (const x of [left,right]) {
         ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,height);ctx.stroke();
       }
+      // One amber playback marker moves across all six aligned tracks.
+      const time = transport.mode === current.mode && Number.isFinite(transport.time)
+        ? Math.max(0, Math.min(duration, transport.time)) : 0;
+      ctx.strokeStyle = '#f1bd74';
+      ctx.lineWidth = 1.7;
+      const playX = time / duration * width;
+      ctx.beginPath();ctx.moveTo(playX,0);ctx.lineTo(playX,height);ctx.stroke();
     }
   }
   function refresh() {
@@ -91,7 +114,7 @@ export function initStemExportClip({
     elements.selected.textContent = duration
       ? durationClock(end-start) + ' selected of ' + durationClock(duration)
       : 'Load the six WAV waveforms to select a common section.';
-    draw();
+    updateTransport();
   }
   function sourcesChanged({mode='',sources=[]}={}) {
     if (disposed) return;
@@ -176,11 +199,25 @@ export function initStemExportClip({
     const minimum=Math.min(0.1,duration/2);
     start=Math.max(0,Math.min(duration-minimum,a));
     end=Math.max(start+minimum,Math.min(duration,b));
+    if (mixer.isPlaying?.()) mixer.pause?.();
+    const position = Number(mixer.getPosition?.());
+    if (Number.isFinite(position) && (position < start || position > end)) {
+      mixer.seekTo?.(start);
+    }
     refresh();
   }
   function preview() {
     if (!duration || end-start<0.1 || busy) return;
-    if (!mixer.previewRange(start,end)) say('Mixer is not ready for segment playback.',true);
+    if (mixer.isPlaying?.()) {
+      mixer.pause?.();
+      return;
+    }
+    const position = Number(mixer.getPosition?.());
+    const from = Number.isFinite(position) && position >= start && position < end - 0.015
+      ? position : start;
+    if (!mixer.previewRange(start,end,from)) {
+      say('Mixer is not ready for segment playback.',true);
+    }
   }
   async function exportZip() {
     if (disposed || busy || bins.size!==6) return false;
@@ -231,15 +268,34 @@ export function initStemExportClip({
   }
   elements.load.addEventListener('click',()=>{void loadWaveforms();});
   elements.preview.addEventListener('click',preview);
+  elements.seek.addEventListener('input', () => {
+    if (!duration || busy) return;
+    const fraction = Math.max(0, Math.min(1000, Number(elements.seek.value) || 0));
+    const target = Math.max(start, Math.min(end, fraction / 1000 * duration));
+    if (!mixer.seekTo?.(target)) {
+      say('Mixer transport is not ready to seek.', true);
+    }
+    updateTransport({
+      ...transport, time: target,
+    });
+  });
   elements.export.addEventListener('click',()=>{void exportZip();});
   elements.start.addEventListener('input',()=>updateRange(Number(elements.start.value)/1000*duration,end));
   elements.end.addEventListener('input',()=>updateRange(start,Number(elements.end.value)/1000*duration));
   elements.startNum.addEventListener('change',()=>updateRange(Number(elements.startNum.value),end));
   elements.endNum.addEventListener('change',()=>updateRange(start,Number(elements.endNum.value)));
+  unsubscribeTransport = mixer.subscribeTransport?.((next) => {
+    updateTransport(next);
+  }) ?? (() => {});
   refresh();
   return {
     sourcesChanged,
     getRange:()=>({start,end,duration}),
-    dispose(){disposed=true;++epoch;bins.clear();},
+    dispose(){
+      disposed=true;
+      ++epoch;
+      unsubscribeTransport();
+      bins.clear();
+    },
   };
 }
