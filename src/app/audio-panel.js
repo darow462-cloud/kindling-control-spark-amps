@@ -5,6 +5,7 @@ import {
   SPECTRUM_MIN_HZ, SPECTRUM_MAX_HZ, ANALYSIS_SECONDS,
   MAX_AUDIO_FILE_BYTES,
 } from './audio-analysis.js';
+import { generateReferencePreset } from './reference-preset.js';
 
 const MAX_RECORD_SECONDS = 30;
 const fmtTime = (seconds) => {
@@ -14,7 +15,10 @@ const fmtTime = (seconds) => {
 const fmtDb = (v) => v <= -110 ? 'Silence' : `${v.toFixed(1)} dBFS`;
 const fmtHz = (v) => v > 0 ? `${Math.round(v).toLocaleString()} Hz` : '—';
 
-export function initAudioPanel(root = document.getElementById('panel-analysis')) {
+export function initAudioPanel(
+  root = document.getElementById('panel-analysis'),
+  { onApplyGeneratedPreset = async () => false } = {},
+) {
   if (!root) return null;
   const $ = (id) => root.querySelector('#' + id);
   const tracks = { reference: { buffer: null, profile: null, url: null, loadId: 0 },
@@ -25,6 +29,58 @@ export function initAudioPanel(root = document.getElementById('panel-analysis'))
   let stopTimer = null;
   let clockTimer = null;
   let recordingStartedAt = 0;
+  let generatedPreset = null;
+  let applyingGenerated = false;
+  const proposalUi = {
+    style: $('analysis-preset-style'),
+    generate: $('analysis-preset-generate'),
+    apply: $('analysis-preset-apply'),
+    export: $('analysis-preset-export'),
+    status: $('analysis-preset-status'),
+    details: $('analysis-preset-details'),
+  };
+
+  function updateGeneratedPreview() {
+    if (!proposalUi.status) return;
+    const hasReference = !!tracks.reference.profile;
+    proposalUi.generate.disabled = !hasReference || applyingGenerated;
+    proposalUi.style.disabled = !hasReference || applyingGenerated;
+    proposalUi.apply.disabled = !generatedPreset || applyingGenerated;
+    proposalUi.export.disabled = !generatedPreset || applyingGenerated;
+    proposalUi.details.replaceChildren();
+    for (const note of generatedPreset?.summary || []) {
+      const line = document.createElement('li');
+      line.textContent = note;
+      proposalUi.details.append(line);
+    }
+    if (!hasReference) {
+      proposalUi.status.textContent =
+        'Load a reference guitar track to generate a first-pass Spark 2 preset automatically.';
+    } else if (generatedPreset && !applyingGenerated) {
+      const position = Number($('analysis-reference-position').value) || 0;
+      proposalUi.status.textContent = 'Suggested preset: ' + generatedPreset.preset.name +
+        ' · reference section starts at ' + fmtTime(position) +
+        ' · experimental estimate, not an exact tone clone.';
+    }
+  }
+
+  function regenerateReferencePreset() {
+    generatedPreset = null;
+    if (tracks.reference.profile) {
+      try {
+        generatedPreset = generateReferencePreset(tracks.reference.profile, {
+          style: proposalUi.style?.value || 'auto',
+          referenceName: tracks.reference.fileName || 'Reference',
+        });
+      } catch (error) {
+        if (proposalUi.status) {
+          proposalUi.status.textContent = 'Cannot generate preset: ' +
+            String(error.message || error).slice(0, 200);
+        }
+      }
+    }
+    updateGeneratedPreview();
+  }
 
   async function audioContext() {
     if (!context) {
@@ -51,6 +107,7 @@ export function initAudioPanel(root = document.getElementById('panel-analysis'))
     if (!item.buffer) return;
     const seconds = Number($('analysis-' + role + '-position').value) || 0;
     item.profile = analyzeAudioBuffer(item.buffer, seconds);
+    if (role === 'reference') regenerateReferencePreset();
     render();
   }
 
@@ -82,6 +139,7 @@ export function initAudioPanel(root = document.getElementById('panel-analysis'))
       if (requestId !== item.loadId) return; // ignore an older in-flight import
       if (!decoded.length || !decoded.duration) throw new Error('Decoded audio has no samples.');
       item.buffer = decoded;
+      item.fileName = String(file.name || 'Reference');
       const range = $('analysis-' + role + '-position');
       range.disabled = false;
       range.min = '0';
@@ -91,6 +149,7 @@ export function initAudioPanel(root = document.getElementById('panel-analysis'))
       const url = URL.createObjectURL(file);
       updatePlayer(role, url);
       item.profile = analyzeAudioBuffer(decoded, 0);
+      if (role === 'reference') regenerateReferencePreset();
       message(role, `${file.name} · ${fmtTime(decoded.duration)} · ${decoded.sampleRate.toLocaleString()} Hz · analyzed first ${Math.min(ANALYSIS_SECONDS, decoded.duration).toFixed(1)} s`);
       render();
     } catch (err) {
@@ -357,6 +416,7 @@ export function initAudioPanel(root = document.getElementById('panel-analysis'))
   }
 
   function render() {
+    updateGeneratedPreview();
     renderMetrics();
     renderBands();
     renderAdvice();
@@ -378,6 +438,49 @@ export function initAudioPanel(root = document.getElementById('panel-analysis'))
       analyzeTrack(role);
     });
   }
+  proposalUi.style?.addEventListener('change', () => {
+    regenerateReferencePreset();
+    render();
+  });
+  proposalUi.generate?.addEventListener('click', () => {
+    regenerateReferencePreset();
+    render();
+  });
+  proposalUi.export?.addEventListener('click', () => {
+    if (!generatedPreset || applyingGenerated) return;
+    const preset = generatedPreset.preset;
+    const blob = new Blob([JSON.stringify(preset, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = preset.name.replace(/[^a-z0-9._-]+/gi, '_') + '.json';
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  });
+  proposalUi.apply?.addEventListener('click', async () => {
+    if (!generatedPreset || applyingGenerated) return;
+    applyingGenerated = true;
+    const proposal = structuredClone(generatedPreset.preset);
+    updateGeneratedPreview();
+    proposalUi.status.textContent = 'Loading the suggested preset into the tone editor…';
+    try {
+      const result = await onApplyGeneratedPreset(proposal);
+      if (result === false) {
+        proposalUi.status.textContent = 'The preset was not loaded. Existing tone left unchanged.';
+      } else {
+        proposalUi.status.textContent = 'Preset loaded into the tone editor. Adjust and Save it if you like.';
+      }
+    } catch (error) {
+      proposalUi.status.textContent = 'Cannot load Spark 2 preset: ' +
+        String(error.message || error).slice(0, 200);
+    } finally {
+      applyingGenerated = false;
+      proposalUi.generate.disabled = !tracks.reference.profile;
+      proposalUi.style.disabled = !tracks.reference.profile;
+      proposalUi.apply.disabled = !generatedPreset;
+      proposalUi.export.disabled = !generatedPreset;
+    }
+  });
   $('analysis-mic-refresh').addEventListener('click', () => refreshInputs());
   $('analysis-record-start').addEventListener('click', startRecording);
   $('analysis-record-stop').addEventListener('click', stopRecording);
