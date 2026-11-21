@@ -332,13 +332,21 @@
 
       <section id="analysis">
         <h2>Analyze guitar tone (experimental)</h2>
-        <p>The <strong>Analyze</strong> tab is an optional, entirely local tool for comparing a reference riff with your guitar track. It does not modify the amp, presets or Bluetooth connection, and cannot determine exact settings from a recording.</p>
+        <p>The <strong>Analyze</strong> tab analyzes local audio. It can compare a reference riff with your own recording, <strong>or generate an experimental Spark 2 preset from the reference alone</strong>. Nothing changes on the amp until you explicitly choose to load the generated preset. It cannot determine the original recording's exact amplifier, cabinet or pedal settings.</p>
         <ol>
           <li>Load a reference audio file (WAV, MP3 or other audio supported by Chromium). Prefer an isolated guitar recording rather than a complete song containing drums, bass and a mastered mix.</li>
-          <li>Load your own guitar recording, or choose a microphone / audio interface and press <strong>Record guitar</strong>. Recording requires microphone permission, is never automatic, and stops at 30 seconds. The app asks the system for the unprocessed input, but device drivers may still add processing.</li>
+          <li><strong>Optional:</strong> load your own guitar recording, or choose a microphone / audio interface and press <strong>Record guitar</strong>. This is only needed to compare your sound against the reference; it is <strong>not required</strong> to generate an initial preset. Recording requires microphone permission and stops at 30 seconds.</li>
           <li>Use each position slider to select the same eight-second musical passage in both tracks. The plotted spectrum shows the frequency distribution relative to each track's own strongest frequency; absolute recording volume is shown separately in RMS and peak dBFS.</li>
-          <li>Compare the six ranges (sub, bass, low mids, mids, presence and air) and listen. The guidance helps you decide whether to check Bass, Middle, Treble, pickup Voice or compression, but is not an automatic preset or an isolated-guitar detector.</li>
+          <li>For comparison, inspect the six bands (sub, bass, low mids, mids, presence and air) and listen. The guidance helps you decide whether to check Bass, Middle, Treble, pickup Voice or compression.</li>
         </ol>
+        <h3>Generate a preset using only the original guitar track (Spark 2)</h3>
+        <ol>
+          <li>Load a reference under <strong>Reference</strong>, ideally an isolated guitar stem from Demucs/RoFormer. The app automatically proposes an initial Spark 2 preset based on the selected eight-second passage.</li>
+          <li>In <strong>Generate Spark 2 preset from reference</strong>, inspect the suggested amp and EQ values. <strong>Automatic estimate</strong> is the default. If the original is clearly clean, crunchy or high-gain but the guess is wrong, choose that character and press Regenerate.</li>
+          <li>Click <strong>Load into Spark 2 editor</strong> to open the editable draft under <strong>Tone</strong>. When a Spark 2 is connected, the app uses its temporary live preset slot; saved hardware slots are not overwritten. To keep the tone, explicitly use Save. For an offline draft, first Save to My presets before connecting.</li>
+          <li>Or use <strong>Export preset JSON</strong> to save an importable Spark preset file without connecting any hardware. You can also compare with your own recording later if desired.</li>
+        </ol>
+        <p class="note">This first version is a transparent frequency/dynamics heuristic, not machine-learned amp identification. Gain, distortion texture, cabinet, mic, multiple layered guitars, delay and reverb cannot be recovered reliably from a finished recording. It produces a plausible starting point, not an exact match.</p>
         <p><strong>Privacy:</strong> imported audio, recordings and computed data remain in memory on your device. They are never uploaded or saved to a preset. Closing the app clears the audio. Use headphones to avoid microphone feedback. If the recording device is unavailable, you can record in another application and import its file.</p>
         <p class="note">File import has a 40 MB size limit. Your decoder's supported formats depend on the installed Chromium/operating system; WAV and MP3 are the most broadly compatible. No automatic guitar-source separation is performed.</p>
       </section>
