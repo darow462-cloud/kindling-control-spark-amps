@@ -43,9 +43,23 @@ jobs:
         with:
           workspaces: third_party/stemyla -> target
           key: stemyla-b2a7718-wasm
-      - name: Install pinned Trunk bundler
+      - name: Install pinned official Trunk bundler binary
         shell: bash
-        run: cargo install --locked trunk --version 0.22.1
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --silent --show-error \
+            -o /tmp/trunk.tgz \
+            https://github.com/trunk-rs/trunk/releases/download/v0.22.1/trunk-x86_64-unknown-linux-gnu.tar.gz
+          curl --fail --location --retry 3 --silent --show-error \
+            -o /tmp/trunk.tgz.sha256 \
+            https://github.com/trunk-rs/trunk/releases/download/v0.22.1/trunk-x86_64-unknown-linux-gnu.tar.gz.sha256
+          (cd /tmp && sha256sum -c trunk.tgz.sha256)
+          mkdir -p /tmp/trunk-release
+          tar -xzf /tmp/trunk.tgz -C /tmp/trunk-release
+          trunk_bin=$(find /tmp/trunk-release -type f -name trunk -print -quit)
+          test -n "$trunk_bin"
+          install -m 755 "$trunk_bin" "$HOME/.cargo/bin/trunk"
+          trunk --version
       - name: Build local RoFormer WASM and its three workers
         working-directory: third_party/stemyla/app
         shell: bash
