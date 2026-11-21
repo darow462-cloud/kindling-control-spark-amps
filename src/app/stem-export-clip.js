@@ -12,6 +12,7 @@ export function initStemExportClip({
   mixer,
   windowRef = window,
   documentRef = document,
+  download = triggerDownload,
 } = {}) {
   if (!root || !mixer) return null;
   const $ = (id) => root.querySelector('#' + id);
@@ -200,7 +201,7 @@ export function initStemExportClip({
       say('Packaging six aligned PCM16 WAVs into ZIP…');
       const zip=await wavZip(entries);
       if (token!==epoch || disposed) throw new Error('Track selection changed before export.');
-      triggerDownload(zip,current.mode+'-six-stems-clip.zip',{documentRef});
+      download(zip,current.mode+'-six-stems-clip.zip',{documentRef});
       say('Six aligned WAV clips exported as ZIP. Original tracks are unchanged.');
       return true;
     } catch(error) {
