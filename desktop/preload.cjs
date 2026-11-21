@@ -7,8 +7,8 @@ contextBridge.exposeInMainWorld('kindlingDesktop', {
   onBluetoothDevices: (cb) => ipcRenderer.on('bt:devices', (_e, devices) => cb(devices)),
   selectBluetoothDevice: (id) => ipcRenderer.send('bt:select', id),
   roformer: {
-    // No arbitrary paths or commands: the host only opens pinned local assets.
-    openStudio: () => ipcRenderer.invoke('roformer:open'),
+    // Read-only fixed local studio URL; the Stems tab embeds it in an iframe.
+    status: () => ipcRenderer.invoke('roformer:status'),
   },
   stems: {
     supported: process.platform === 'win32',
