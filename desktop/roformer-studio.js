@@ -28,8 +28,10 @@ export function studioContentType(path) {
 
 export async function resolveStudioResource(root, requestedUrl) {
   const url = new URL(requestedUrl);
-  if (url.origin !== ROFORMER_ORIGIN || !['GET', 'HEAD'].includes('GET')) {
-    // The HTTP method is checked by the Electron protocol handler.
+  // Custom Electron schemes have an opaque origin in Node's WHATWG URL
+  // implementation, so compare protocol and host explicitly.
+  if (url.protocol !== 'kindling-roformer:' || url.hostname !== 'studio' ||
+      url.username || url.password || url.port) {
     throw new Error('untrusted RoFormer studio URL');
   }
   const decoded = decodeURIComponent(url.pathname);
