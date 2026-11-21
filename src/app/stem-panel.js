@@ -3,6 +3,7 @@
 import { initInlineRoformer } from './roformer-inline.js';
 import { initStemCompare } from './stem-compare.js';
 import { initStemMixer } from './stem-mixer.js';
+import { initRoFormerTransfer } from './roformer-transfer.js';
 
 const fmtSize = (size) => `${(size / (1024 * 1024)).toFixed(1)} MB`;
 
@@ -29,6 +30,11 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
       compare?.pause();
       for (const audio of $('stem-track-list').querySelectorAll('audio')) audio.pause();
     },
+  });
+  const roformerTransfer = initRoFormerTransfer({
+    root: $('stem-mixer'),
+    frame: $('stem-roformer-frame'),
+    onFiles: (files) => mixer?.loadRoFormerFiles(files) ?? 0,
   });
   const state = { file: null, output: null, running: false, stems: [], activeId: null,
     mode: 'standard', peak: null };
@@ -214,6 +220,7 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
     inlineRoformer?.dispose();
     compare?.dispose();
     mixer?.dispose();
+    roformerTransfer?.dispose();
     clearPlayers();
   }, { once: true });
   updateButtons();
