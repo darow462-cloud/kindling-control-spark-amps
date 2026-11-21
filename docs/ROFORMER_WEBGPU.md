@@ -60,6 +60,32 @@ does not automatically share audio files or stems with the native app.
 - The feature is a **listening tool**: matching source songs and manually
   matching their perceived levels remain the user's responsibility.
 
+## Shared six-track listening mixer (0.7.3 experimental)
+
+- The new local Stems mixer offers six channels (drums, bass, vocals, guitar,
+  piano, other) with per-channel playback volume, Mute/Solo, Play/Pause,
+  Stop, a seek slider and a bank selector (Demucs versus RoFormer).
+- A successful native Demucs run automatically loads its validated session
+  URLs into the Demucs bank. The service, its peak-guarded WAV output and the
+  original per-track preview remain unchanged.
+- RoFormer still runs as a separately isolated, pinned WebGPU app inside the
+  Stems tab. The mixer NEVER reads its origin storage, files or model weights
+  without user action. Export individual WAVs from RoFormer, then choose them
+  explicitly with the main mixer's multi-file selector or each channel's
+  Choose WAV control. Names containing exactly one instrument label are
+  assigned automatically; ambiguous filenames require manual assignment.
+  Generated in-memory Blob URLs are revoked on replacement and on close.
+- The mixer sends the selected guitar to Analyze: native Demucs uses the
+  validated session URL; the RoFormer channel passes only the File selected
+  by the user. Analyze reuses its existing local Web Audio decoder and 180 MB
+  size cap. No new Electron IPC or subprocess capability is exposed.
+- Playback uses independent HTML media players with timeline alignment and
+  simple drift correction. It is NOT sample-accurate DAW synchronization,
+  cannot guarantee phase-coherent summation and does not render/export a
+  new mix. Volume/Mute/Solo do not alter WAV data, model inference or
+  normalized output; play at moderate volume to prevent overload.
+- The independent 0.7.2 guitar A/B listening panel remains available.
+
 ## Technical boundaries
 
 - `desktop/main.js` exposes only `roformer:status` via a trusted main-app IPC, returning a fixed local URL and package availability. The renderer cannot supply file paths, CLI args, executable names or a process to launch, and no second BrowserWindow is created. `src/app/roformer-inline.js` lazy-loads the sandboxed iframe only when Stems is selected, delegates WebGPU through `allow=webgpu`, and preserves the same loaded iframe when switching back from Demucs.
