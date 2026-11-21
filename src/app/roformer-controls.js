@@ -5,6 +5,7 @@
 const COMMAND = 'kindling.roformer.control.command.v1';
 const ACK = 'kindling.roformer.control.ack.v1';
 const STATE = 'kindling.roformer.control.state.v1';
+const COMPLETED = 'kindling.roformer.stems.completed.v1';
 const STUDIO_URL = 'kindling-roformer://studio/index.html';
 const MAX_SONG_BYTES = 350 * 1024 * 1024;
 const AUDIO_FILE = /\.(wav|aiff|aif|flac|mp3|ogg|m4a|aac)$/i;
@@ -21,6 +22,7 @@ export function initRoFormerControls({
   windowRef = window,
   FileType = File,
   timeoutMs = 15000,
+  onCompleted = () => {},
 } = {}) {
   if (!root || !frame) return null;
   const $ = (name) => root.querySelector('#' + name);
@@ -35,6 +37,7 @@ export function initRoFormerControls({
 
   let state = null;
   let pending = null;
+  let acceptedSeparation = null;
   let disposed = false;
   function say(message, kind = '') {
     if (disposed) return;
@@ -124,18 +127,37 @@ export function initRoFormerControls({
       render();
     } else if (message.type === ACK && pending && message.nonce === pending.nonce) {
       const action = pending.action;
+      const nonce = pending.nonce;
       forgetPending();
       if (!message.ok) {
         say(String(message.message || 'RoFormer rejected the action.').slice(0, 240), 'error');
       } else {
+        if (action === 'open_song') acceptedSeparation = null;
+        if (action === 'separate') acceptedSeparation = nonce;
         say(action === 'open_song' ? 'Opening song in the RoFormer workspace…' :
           action === 'download_model' ? 'Model download requested. It is not automatic.' :
           'Separation requested. Results will be available after processing.');
+      }
+    } else if (message.type === COMPLETED &&
+        acceptedSeparation !== null &&
+        message.nonce === acceptedSeparation &&
+        typeof message.session === 'string' &&
+        /^\d{10,18}$/.test(message.session)) {
+      // Only a successfully acknowledged native Kindling action can trigger
+      // auto-import. No import occurs on startup, old storage restore or a
+      // manual separation launched inside the Advanced Studio.
+      acceptedSeparation = null;
+      say('RoFormer finished saving all six tracks. Importing into mixer…');
+      try {
+        onCompleted({ nonce: message.nonce, session: message.session });
+      } catch (error) {
+        say('Auto-import could not start: ' + error.message, 'error');
       }
     }
   }
   function onLoad() {
     state = null;
+    acceptedSeparation = null;
     forgetPending();
     say('Connecting to the native RoFormer controls…');
     render();
@@ -155,6 +177,7 @@ export function initRoFormerControls({
   return {
     getState: () => state,
     dispose() {
+      acceptedSeparation = null;
       disposed = true;
       forgetPending();
       windowRef.removeEventListener('message', onMessage);
