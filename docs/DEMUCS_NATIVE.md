@@ -41,6 +41,14 @@ The official source-release workflow completed its Windows CLI build successfull
 6. WAV stems are played directly from local files and can be imported into Analyze as the reference. The audio is not sent to a hosted API, to Spark over Bluetooth or to error reporting.
 7. The model's first-run download requires internet. Later inference is local. There is no cloud stem processing.
 
+## v0.6.2 experimental input normalization
+
+The pinned native `demucs-rs v0.3.5` implementation does not perform the input gain/offset preprocessing found in the official Python Demucs `Separator.separate_tensor()` API. The Python API calculates the full-song mono/mid reference, subtracts its mean from both channels, divides by the reference standard deviation, runs the models over the entire song (possibly in overlapping chunks), and then restores the same static mean/standard deviation on every output stem.
+
+To close this implementation gap, the dedicated source-built 0.6.2 Windows Portable uses `tools/patch-demucs-normalization.py` before compiling Rust. It computes the reference mean and std only ONCE for the whole decoded song, uses one shared stereo scaling for all model chunks, and exactly reverses the same scaling after inference. Inputs too quiet to normalize safely retain unity gain. It does not apply gain changes within a song or independently per instrument. No cloud audio processing, no model weight changes, and no alteration of the Spark amp protocol.
+
+This may improve consistency of model inference, but **does not guarantee** that every artifact or perceived volume fluctuation disappears. The user should compare the same song in the previous 0.6.1 prebuilt and new 0.6.2 source-built apps. The separate default-on `Prevent clipping` guard still reduces all six output stems by one fixed gain only if their shared peak exceeds -1 dBFS; it is not a compressor. Independent per-instrument volumes and true time-varying gain leveling are not implemented here, to avoid introducing audible pumping.
+
 ## Known limitations
 
 - A GPU/driver supporting Vulkan and enough RAM/VRAM are needed. Native inference may fail with unsupported or insufficient GPU resources. The app reports the native error and does not silently substitute a spectrum/EQ filter.
