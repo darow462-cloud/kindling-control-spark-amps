@@ -12,6 +12,7 @@
   const REQUEST = 'kindling.roformer.stems.request.v1';
   const RESULT = 'kindling.roformer.stems.result.v1';
   const ERROR = 'kindling.roformer.stems.error.v1';
+  const COMPLETED = 'kindling.roformer.stems.completed.v1';
   const ALLOWED = new Set(['drums', 'bass', 'vocals', 'guitar', 'piano', 'other']);
   const MAX_FILE = 256 * 1024 * 1024;
   const MAX_TOTAL = 1024 * 1024 * 1024;
@@ -35,7 +36,7 @@
     const tag = (offset) => String.fromCharCode(...head.slice(offset, offset + 4));
     return (tag(0) === 'RIFF' || tag(0) === 'RF64') && tag(8) === 'WAVE';
   }
-  async function getStems() {
+  async function getStems(expectedSession = null) {
     if (!navigator.storage?.getDirectory) {
       throw new Error('Browser storage is unavailable for RoFormer.');
     }
@@ -44,6 +45,11 @@
     const current = (await (await file(sessions, 'current')).text()).trim();
     if (!/^\d{10,18}$/.test(current)) {
       throw new Error('No valid RoFormer song session is open.');
+    }
+    // A completed run is bound to a specific session, so reopening another
+    // song cannot import the old WAVs by accident.
+    if (expectedSession !== null && expectedSession !== current) {
+      throw new Error('The completed RoFormer session is no longer current.');
     }
     const session = await child(sessions, current);
     const meta = await (await file(session, 'meta')).text();
@@ -75,7 +81,10 @@
     if (!stems.length) {
       throw new Error('No supported six-stem RoFormer WAVs were found.');
     }
-    return stems;
+    if (expectedSession && stems.length !== 6) {
+      throw new Error('The completed session does not contain all six WAV stems.');
+    }
+    return { stems, session: current };
   }
 
   // User-driven control channel for a *locally rebuilt* pinned Stemyla WASM.
@@ -94,6 +103,15 @@
     take() { return controlQueue.shift() ?? null; },
     ack(nonce, ok, message) {
       window.parent.postMessage({ type: ACK, nonce, ok, message }, '*');
+    },
+    completed(nonce, session) {
+      // A Rust callback is issued only after Stemyla commits its WAV files
+      // and meta. The parent must independently match this to the accepted
+      // separate command before making any request.
+      if (/^[a-zA-Z0-9-]{16,80}$/.test(nonce) &&
+          /^\d{10,18}$/.test(session)) {
+        window.parent.postMessage({ type: COMPLETED, nonce, session }, '*');
+      }
     },
     report(modelReady, modelLoading, downloadDone, downloadTotal,
       separating, progressDone, progressTotal, songLoaded, canSeparate, stopped, text) {
@@ -152,10 +170,18 @@
         !/^[a-zA-Z0-9-]{16,80}$/.test(data.nonce) || busy) return;
     busy = true;
     try {
-      const stems = await getStems();
+      const expectedSession = typeof data.expectedSession === 'string' &&
+          /^\d{10,18}$/.test(data.expectedSession)
+        ? data.expectedSession : null;
+      // An invalid session marker must fail closed rather than reading
+      // whichever track happens to be open now.
+      if (data.expectedSession != null && !expectedSession) {
+        throw new Error('Invalid completed-session identifier.');
+      }
+      const { stems, session } = await getStems(expectedSession);
       // File and Blob objects are structured-cloned without copying audio
       // into JS arrays. This does not submit anything over the network.
-      window.parent.postMessage({ type: RESULT, nonce: data.nonce, stems }, '*');
+      window.parent.postMessage({ type: RESULT, nonce: data.nonce, stems, session }, '*');
     } catch (error) {
       window.parent.postMessage({
         type: ERROR,
