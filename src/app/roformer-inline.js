@@ -21,6 +21,19 @@ export function initInlineRoformer({
   const demucsPane = $('stem-demucs-pane');
   const frame = $('stem-roformer-frame');
   const status = $('stem-roformer-status');
+  const advancedToggle = $('stem-roformer-advanced-toggle');
+  const advancedShell = $('stem-roformer-frame-shell');
+  // Keep the GPU iframe mounted at its real rendering size even when its
+  // visible region is collapsed. Never detach/reload it on toggle.
+  function toggleAdvanced() {
+    if (!advancedShell || !advancedToggle) return;
+    const expanded = advancedShell.classList.toggle('expanded');
+    advancedToggle.setAttribute('aria-expanded', String(expanded));
+    advancedToggle.textContent = expanded ? 'Hide Advanced Studio' : 'Show Advanced Studio';
+    frame.tabIndex = expanded ? 0 : -1;
+  }
+  advancedToggle?.addEventListener('click', toggleAdvanced);
+  if (advancedShell && !advancedShell.classList.contains('expanded')) frame.tabIndex = -1;
   const supported = typeof bridge?.status === 'function';
   let active = supported ? 'roformer' : 'demucs';
   let mounted = false;
