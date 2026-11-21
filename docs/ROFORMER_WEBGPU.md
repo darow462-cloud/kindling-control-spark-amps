@@ -190,6 +190,34 @@ by Rust/egui, not exposed as ordinary DOM controls:
 - This is still an experimental feature until GPU inference, OPFS writes,
   session binding, audio playback and controls are verified on Windows.
 
+## On-demand local health diagnostic (0.7.7 experimental)
+
+- Use **Check RoFormer setup** in Stems if the model download,
+  six-track separation or automatic import appears stalled. The
+  KindlingControl parent sends a one-time nonce to the exact pinned
+  WebGPU iframe; its isolated `desktop/roformer-transfer-bridge.js`
+  responds with five booleans: companion bridge present, native Rust
+  status observed, browser WebGPU API available, browser OPFS API
+  available, and Stemyla canvas present.
+- The first-party host verifies the exact iframe window, known
+  origin/opaque-origin fallback and nonce, then adds the age of its
+  last validated Rust state report, model ready/processing flags and
+  number of RoFormer mixer channels. A report older than 10 seconds
+  is shown as stale. The button does **not** initialize or download
+  the model, enumerate OPFS directories, read files, send audio,
+  identify GPU hardware or contact network services.
+- **Copy diagnostic** puts only these coarse statuses in the
+  clipboard, never song titles, local paths, model checkpoint
+  names or song/session identifiers. This is a local capability
+  and command-channel check, not a GPU inference benchmark.
+- If WebGPU is missing, inspect GPU acceleration. If OPFS is
+  missing, use the manual WAV import. If Rust messages are stale,
+  open Advanced Studio for troubleshooting. A real Windows GPU
+  separation is still necessary before promoting this branch.
+- This release reuses the exact SHA256-verified v0.7.6 pinned
+  Rust/WebAssembly studio. The JS companion and parent UI are
+  updated but the Rust separation code is unchanged.
+
 ## Technical boundaries
 
 - `desktop/main.js` exposes only `roformer:status` via a trusted main-app IPC, returning a fixed local URL and package availability. The renderer cannot supply file paths, CLI args, executable names or a process to launch, and no second BrowserWindow is created. `src/app/roformer-inline.js` lazy-loads the sandboxed iframe only when Stems is selected, delegates WebGPU through `allow=webgpu`, and preserves the same loaded iframe when switching back from Demucs.
