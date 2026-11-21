@@ -264,6 +264,27 @@ by Rust/egui, not exposed as ordinary DOM controls:
   WebAssembly from the successful 0.7.6 build. No model weights or
   modified inference code are distributed in the editor change.
 
+## Source and six-stem playback seek (0.7.9)
+
+- Both 0.7.8 waveform clip editors now expose a separate accessible
+  **Playback** slider and a live `MM:SS.cc / MM:SS.cc` time display.
+  This slider controls the **playhead**, not the cyan start/end trim
+  handles. An amber vertical cursor mirrors current playback on the
+  source waveform and every aligned stem waveform.
+- In the source editor, seeking uses the existing local HTMLAudioElement
+  and clamps to the selected trim interval. Preview toggles pause/resume
+  from the selected location, and Stop seeks back to the selection start.
+  No new audio files are created by listening or scrubbing.
+- In the six-stem editor, the existing mixer exposes a read-only live
+  transport subscription and `seekTo` method that seeks all six
+  players together. Its preview can resume at the selected current
+  position and stops at the chosen trim end. Mixer Mute/Solo, native
+  player volume, ZIP export and original source file behavior remain
+  unchanged.
+- Unit tests exercise live time updates, source/mixer seeking while
+  playing, preview pause/resume, and stopping at selection boundaries.
+  Real Windows and GPU audio-device behavior still needs local QA.
+
 ## Technical boundaries
 
 - `desktop/main.js` exposes only `roformer:status` via a trusted main-app IPC, returning a fixed local URL and package availability. The renderer cannot supply file paths, CLI args, executable names or a process to launch, and no second BrowserWindow is created. `src/app/roformer-inline.js` lazy-loads the sandboxed iframe only when Stems is selected, delegates WebGPU through `allow=webgpu`, and preserves the same loaded iframe when switching back from Demucs.
