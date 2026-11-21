@@ -76,9 +76,18 @@ export function initRoFormerTransfer({
     const message = event.data;
     if (!message || message.nonce !== request.nonce ||
         ![ROFORMER_TRANSFER_RESULT, ROFORMER_TRANSFER_ERROR].includes(message.type)) return;
+    const expectedSession = request.expectedSession;
     invalidate();
     if (message.type === ROFORMER_TRANSFER_ERROR) {
       say('RoFormer import unavailable: ' + String(message.message || 'No completed stems').slice(0, 240), 'error');
+      return;
+    }
+    if (expectedSession && message.session !== expectedSession) {
+      say('RoFormer changed songs before its WAVs could be imported.', 'error');
+      return;
+    }
+    if (expectedSession && (!Array.isArray(message.stems) || message.stems.length !== 6)) {
+      say('RoFormer did not return all six completed WAVs.', 'error');
       return;
     }
     if (!validRoFormerTransfer(message.stems, BlobType)) {
@@ -98,12 +107,16 @@ export function initRoFormerTransfer({
       say('RoFormer WAV transfer failed: ' + String(error.message || error), 'error');
     }
   }
-  function importNow() {
-    if (disposed || !ready || request) return;
+  function importNow(expectedSession = null) {
+    if (disposed || !ready || request) return false;
+    if (expectedSession !== null && !/^\d{10,18}$/.test(expectedSession)) {
+      say('Invalid completed RoFormer session.', 'error');
+      return false;
+    }
     const receiver = frame.contentWindow;
     if (!receiver) {
       say('RoFormer workspace is not ready.', 'error');
-      return;
+      return false;
     }
     const nonce = windowRef.crypto.randomUUID();
     const timeout = setTimeout(() => {
@@ -111,24 +124,32 @@ export function initRoFormerTransfer({
       invalidate();
       say('RoFormer did not respond. Check that separation has finished.', 'error');
     }, timeoutMs);
-    request = { nonce, timeout };
+    request = { nonce, timeout, expectedSession };
     update();
-    say('Reading completed RoFormer stems from its local song storage…');
+    say(expectedSession
+      ? 'Automatically loading six completed RoFormer stems into the mixer…'
+      : 'Reading completed RoFormer stems from its local song storage…');
     try {
-      receiver.postMessage({ type: ROFORMER_TRANSFER_REQUEST, nonce }, '*');
+      receiver.postMessage({
+        type: ROFORMER_TRANSFER_REQUEST, nonce,
+        ...(expectedSession ? { expectedSession } : {}),
+      }, '*');
+      return true;
     } catch (error) {
       invalidate();
       say('Cannot request RoFormer WAVs: ' + error.message, 'error');
+      return false;
     }
   }
 
-  button.addEventListener('click', importNow);
+  button.addEventListener('click', () => importNow());
   frame.addEventListener('load', onLoad);
   frame.addEventListener('error', onFrameError);
   windowRef.addEventListener('message', onMessage);
   update();
   return {
     isReady: () => ready,
+    importCompleted(session) { return importNow(session); },
     dispose() {
       disposed = true;
       invalidate();
