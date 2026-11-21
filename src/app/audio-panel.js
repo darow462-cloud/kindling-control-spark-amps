@@ -99,6 +99,16 @@ export function initAudioPanel(root = document.getElementById('panel-analysis'))
     }
   }
 
+  async function loadImportedGuitar(file) {
+    // User chose an exported RoFormer WAV explicitly in the local mixer.
+    // The isolated RoFormer iframe cannot read files from the main application.
+    if (!file || typeof file.name !== 'string' || !/\.wav$/i.test(file.name) ||
+        typeof file.arrayBuffer !== 'function') {
+      throw new Error('Choose a local RoFormer guitar WAV first.');
+    }
+    await loadTrack(file, 'reference', { maxBytes: 180 * 1024 * 1024, rethrow: true });
+  }
+
   async function loadSeparatedGuitar(stem) {
     if (!stem || stem.name !== 'guitar' ||
         !/^kindling-stem:\/\/[a-f0-9-]+\/guitar\.wav$/.test(stem.url)) {
@@ -384,5 +394,5 @@ export function initAudioPanel(root = document.getElementById('panel-analysis'))
     context?.close().catch(() => {});
   });
   render();
-  return { redraw: drawSpectrum, loadSeparatedGuitar };
+  return { redraw: drawSpectrum, loadSeparatedGuitar, loadImportedGuitar };
 }
