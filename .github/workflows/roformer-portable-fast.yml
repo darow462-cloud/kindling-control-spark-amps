@@ -1,4 +1,4 @@
-name: KindlingControl 0.7.2 Guitar A/B Windows Portable
+name: KindlingControl 0.7.3 Shared Stem Mixer Windows Portable
 
 # Fast packaging after source and model-inference code were built from pinned
 # upstream code in run 44881816942 (WASM), and normalized Demucs was compiled
@@ -6,7 +6,7 @@ name: KindlingControl 0.7.2 Guitar A/B Windows Portable
 on:
   push:
     branches:
-      - feature/v0.7.2-stems-ab-compare
+      - feature/v0.7.3-shared-stem-mixer
     paths:
       - '.github/workflows/roformer-portable-fast.yml'
       - 'desktop/**'
@@ -50,6 +50,10 @@ jobs:
           node --check src/app/roformer-inline.js
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node --check src/app/stem-compare.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check src/app/stem-mixer.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check src/app/audio-panel.js
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       # Built from pinned Stemyla commit b2a771808d36f9a8d2f333528805d0ee2c1040a8;
@@ -126,7 +130,7 @@ jobs:
           Copy-Item $license build/bin/LICENSE.txt
           node tools/make-roformer-builder-config.js
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          node tools/stamp-version.js 0.7.2-ab.1
+          node tools/stamp-version.js 0.7.3-mixer.1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build independent Windows Portable with two real models
@@ -134,13 +138,13 @@ jobs:
         run: >
           npx electron-builder --config build/roformer-electron-builder.json
           --win portable --x64 --publish never
-          --config.extraMetadata.version=0.7.2-ab.1
-          --config.productName="KindlingControl RoFormer A-B 0.7.2 Test"
-          --config.appId=dev.darow462.kindlingcontrol.roformer072ab
+          --config.extraMetadata.version=0.7.3-mixer.1
+          --config.productName="KindlingControl RoFormer Mixer 0.7.3 Test"
+          --config.appId=dev.darow462.kindlingcontrol.roformer073mixer
 
       - uses: actions/upload-artifact@v4
         with:
-          name: KindlingControl-RoFormer072-AB-Portable-Win-x64
+          name: KindlingControl-RoFormer073-Mixer-Portable-Win-x64
           path: dist/*.exe
           if-no-files-found: error
           retention-days: 14
