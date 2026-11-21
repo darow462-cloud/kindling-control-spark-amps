@@ -120,9 +120,23 @@ export function initSourceClip({
     applied = null;
   }
   async function loadSource({ engine, file }) {
-    if (disposed || !['demucs','roformer'].includes(engine) || !file ||
+    if (disposed || busy || !['demucs','roformer'].includes(engine) || !file ||
         typeof file.size !== 'number' || file.size < 1) return false;
     const token = ++epoch;
+    // Switching engines must never leave a staged clip in the other engine.
+    // Restore its selected source first; a later click must not separate
+    // an old clip while the UI displays a different original.
+    if (source && source.engine !== engine && applied) {
+      try {
+        if (source.engine === 'demucs') await onDemucsRestore();
+        else await onRoFormerRestore(source.file);
+      } catch (error) {
+        say('Previous selected clip could not be restored: ' +
+          String(error.message || error).slice(0, 140), 'error');
+        return false;
+      }
+    }
+    if (disposed || token !== epoch) return false;
     releaseSource();
     const name = String(file.name || 'audio').slice(0, 140);
     const url = urlApi.createObjectURL(file);
