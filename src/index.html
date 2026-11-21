@@ -144,6 +144,22 @@
           <strong>BS-RoFormer SW</strong>
           <span>GPU · six tracks · local processing</span>
         </div>
+        <div id="stem-roformer-native-controls" class="stem-roformer-native-controls" aria-label="Native RoFormer controls">
+          <h3>RoFormer · song and separation</h3>
+          <p class="hint">Use these controls to operate the bundled BS-RoFormer SW model directly. The separate Stemyla canvas below remains available for advanced features and troubleshooting. GPU processing and audio remain on this computer.</p>
+          <div class="stem-roformer-control-bar">
+            <button type="button" id="stem-roformer-choose-song" disabled>Choose song…</button>
+            <input id="stem-roformer-song-file" type="file" accept=".wav,.aiff,.aif,.flac,.mp3,.ogg,.m4a,.aac" hidden>
+            <span id="stem-roformer-song-name" class="stem-file-label">No song selected</span>
+          </div>
+          <div class="stem-roformer-control-bar">
+            <button type="button" id="stem-roformer-download" disabled>Download BS-RoFormer SW model (~350 MB)</button>
+            <button type="button" id="stem-roformer-separate" class="primary" disabled>Separate 6 tracks</button>
+          </div>
+          <p class="hint">The model download is optional and requires an explicit click. Its original licence grant is unclear. No weights are packaged, and no download starts automatically.</p>
+          <progress id="stem-roformer-control-progress" max="100" hidden></progress>
+          <p id="stem-roformer-control-status" class="stem-status" role="status" aria-live="polite">Open the Stems tab to connect to RoFormer.</p>
+        </div>
         <p class="hint">The first download (~350 MB) is optional and starts only when you press Download model below. The checkpoint's original license is unclear; the open-source app and model weights are separate. Solo, Mute and WAV export are inside the integrated workspace.</p>
         <p id="stem-roformer-status" class="stem-status" role="status" aria-live="polite">The RoFormer workspace opens here when you select Stems.</p>
         <div id="stem-roformer-frame-shell" class="stem-roformer-frame-shell">
