@@ -136,6 +136,38 @@ test('manual import of six exported RoFormer WAVs supports volume, mute, solo, s
     'blob:mix/4', 'blob:mix/5', 'blob:mix/6']);
 });
 
+test('shared transport reports live time, permits synced seeking and bounds preview playback', async () => {
+  const f = fixture();
+  const snapshots = [];
+  const unsubscribe = f.mixer.subscribeTransport((snapshot) => snapshots.push(snapshot));
+  assert.equal(snapshots.at(-1).playing, false);
+  assert.equal(f.mixer.loadDemucs(MIX_STEMS.map(demucs)),6);
+  assert.equal(f.mixer.getDuration(),60);
+  assert.equal(f.mixer.previewRange(10,20),true);
+  await Promise.resolve();
+  assert.equal(f.mixer.getPosition(),10);
+  assert.equal(f.mixer.isPlaying(),true);
+  assert.equal(snapshots.at(-1).playing,true);
+  assert.equal(f.mixer.seekTo(14),true);
+  assert.ok(f.players.every((player)=>player.currentTime===14));
+  assert.equal(snapshots.at(-1).time,14);
+  assert.equal(f.mixer.seekTo(Number.NaN),false);
+  assert.equal(f.mixer.seekTo(21),true);
+  assert.equal(f.mixer.isPlaying(),false,'seeking beyond preview end stops playback');
+  assert.equal(f.mixer.getPosition(),21);
+  assert.equal(f.mixer.previewRange(10,20,14),true);
+  await Promise.resolve();
+  assert.equal(f.mixer.getPosition(),14,'resume at chosen preview position');
+  f.players[0].currentTime=20;
+  f.players[0].fire('timeupdate');
+  assert.equal(f.mixer.isPlaying(),false,'master end of preview stops synchronized players');
+  unsubscribe();
+  const count=snapshots.length;
+  f.mixer.seekTo(4);
+  assert.equal(snapshots.length,count,'unsubscribe removes transport observer');
+  f.mixer.dispose();
+});
+
 test('trusted native Demucs set is loaded automatically and rejects arbitrary HTTP URLs', () => {
   const f = fixture();
   assert.equal(f.mixer.loadDemucs([{ name: 'guitar', url: 'https://example.com/guitar.wav' }]), 0);
