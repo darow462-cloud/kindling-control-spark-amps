@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, rm, symlink, readFileSync } from 'node:fs';
-import { mkdtemp as mkdtempAsync, mkdir as mkdirAsync, writeFile as writeFileAsync, rm as rmAsync, symlink as symlinkAsync } from 'node:fs/promises';
+import { mkdtemp as mkdtempAsync, mkdir as mkdirAsync, writeFile as writeFileAsync, rm as rmAsync, symlink as symlinkAsync, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runInNewContext } from 'node:vm';
@@ -27,10 +27,10 @@ test('bundled studio resolver only serves trusted host and files inside the stud
   await writeFileAsync(join(dir, 'secret.txt'), 'SECRET');
   try {
     const homepage = await resolveStudioResource(studio, 'kindling-roformer://studio/');
-    assert.equal(homepage.file, join(studio, 'index.html'));
+    assert.equal(homepage.file, await realpath(join(studio, 'index.html')));
     assert.equal(homepage.type, 'text/html; charset=utf-8');
     const worker = await resolveStudioResource(studio, 'kindling-roformer://studio/worker.js');
-    assert.equal(worker.file, join(studio, 'worker.js'));
+    assert.equal(worker.file, await realpath(join(studio, 'worker.js')));
     await assert.rejects(resolveStudioResource(studio, 'kindling://app/index.html'), /untrusted/);
     await assert.rejects(resolveStudioResource(studio, 'kindling-roformer://evil/index.html'), /untrusted/);
     await assert.rejects(resolveStudioResource(studio, 'https://example.com/index.html'), /untrusted/);
