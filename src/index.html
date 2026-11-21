@@ -144,7 +144,13 @@
         <p class="hint">Non-destructive: choose a short musical passage before running either engine. The original song stays unchanged. Waveforms support mono/stereo files up to 180 MB and 15 minutes.</p>
         <p id="stem-source-name" class="stem-file-label">Choose an audio file in either engine</p>
         <canvas id="stem-source-waveform" class="stem-clip-waveform" width="900" height="112"
-          aria-label="Source audio waveform with selected start and end handles"></canvas>
+          aria-label="Source audio waveform with trim boundaries and playback cursor"></canvas>
+        <div class="stem-playback-transport">
+          <label for="stem-source-seek">Playback</label>
+          <input id="stem-source-seek" type="range" min="0" max="1000" value="0" step="1"
+            aria-label="Seek in source audio" disabled>
+          <span id="stem-source-playback-clock" class="stem-playback-clock" aria-live="off">0:00.00 / 0:00.00</span>
+        </div>
         <div class="stem-clip-range-grid">
           <label>Start
             <input id="stem-source-start" type="range" min="0" max="1000" step="1" value="0">
@@ -156,7 +162,7 @@
           </label>
         </div>
         <div class="stem-clip-actions">
-          <button id="stem-source-preview" type="button" disabled>Preview selection</button>
+          <button id="stem-source-preview" type="button" disabled>Play selection</button>
           <button id="stem-source-preview-stop" type="button" disabled>Stop</button>
           <button id="stem-source-apply" type="button" class="primary" disabled>Apply clip to separator</button>
           <button id="stem-source-export" type="button" disabled>Export source clip (WAV)</button>
@@ -296,10 +302,16 @@
           <p class="hint">One shared start and end for all six stems, keeping them aligned. Select a passage and export six PCM16 WAVs together as ZIP. Original separated files and mixer settings remain unchanged. Maximum length: 15 minutes.</p>
           <div class="stem-clip-actions">
             <button type="button" id="stem-mixer-clips-load" disabled>Load six waveforms</button>
-            <button type="button" id="stem-mixer-clips-preview" disabled>Preview selected mix</button>
+            <button type="button" id="stem-mixer-clips-preview" disabled>Play selection</button>
             <button type="button" id="stem-mixer-clips-export" class="primary" disabled>Export six clipped WAVs (ZIP)</button>
           </div>
           <div id="stem-mixer-clips-waveforms" class="stem-mixer-clips-waveforms"></div>
+          <div class="stem-playback-transport">
+            <label for="stem-mixer-clips-seek">Playback</label>
+            <input id="stem-mixer-clips-seek" type="range" min="0" max="1000" value="0" step="1"
+              aria-label="Seek all six stem tracks together" disabled>
+            <span id="stem-mixer-clips-playback-clock" class="stem-playback-clock" aria-live="off">0:00.00 / 0:00.00</span>
+          </div>
           <div class="stem-clip-range-grid">
             <label>Start
               <input id="stem-mixer-clips-start" type="range" min="0" max="1000" value="0">
