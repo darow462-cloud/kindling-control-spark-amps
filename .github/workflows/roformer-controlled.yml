@@ -1,0 +1,235 @@
+name: KindlingControl 0.7.5 Native RoFormer Controls Portable
+
+on:
+  push:
+    branches:
+      - feature/v0.7.5-native-roformer-controls
+    paths:
+      - '.github/workflows/roformer-controlled.yml'
+      - 'desktop/**'
+      - 'src/**'
+      - 'test/**'
+      - 'tools/make-roformer-builder-config.js'
+      - 'tools/patch-stemyla-controls.py'
+      - 'tools/install-roformer-transfer.js'
+      - 'tools/patch-demucs-normalization.py'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  webgpu-studio:
+    name: Build pinned BS-RoFormer WebGPU WASM studio
+    runs-on: ubuntu-latest
+    timeout-minutes: 80
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.99.0'
+          targets: wasm32-unknown-unknown
+      - name: Fetch exactly pinned MIT/Apache-2.0 Stemyla source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p third_party/stemyla
+          git -C third_party/stemyla init
+          git -C third_party/stemyla remote add origin https://github.com/lloydmeta/stemyla.git
+          git -C third_party/stemyla fetch --depth 1 origin b2a771808d36f9a8d2f333528805d0ee2c1040a8
+          git -C third_party/stemyla checkout --detach FETCH_HEAD
+          test "$(git -C third_party/stemyla rev-parse HEAD)" = b2a771808d36f9a8d2f333528805d0ee2c1040a8
+      - name: Apply bounded KindlingControl Rust API patch to exact pinned Stemyla
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/patch-stemyla-controls.py third_party/stemyla/app/src/lib.rs
+          grep -q "fn kindling_poll(&mut self" third_party/stemyla/app/src/lib.rs
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: third_party/stemyla -> target
+          key: stemyla-b2a7718-wasm
+      - name: Install pinned official Trunk bundler binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --silent --show-error \
+            -o /tmp/trunk.tgz \
+            https://github.com/trunk-rs/trunk/releases/download/v0.22.1/trunk-x86_64-unknown-linux-gnu.tar.gz
+          curl --fail --location --retry 3 --silent --show-error \
+            -o /tmp/trunk.tgz.sha256 \
+            https://github.com/trunk-rs/trunk/releases/download/v0.22.1/trunk-x86_64-unknown-linux-gnu.tar.gz.sha256
+          # Upstream publishes a raw 64-hex digest, not a sha256sum filename record.
+          expected=$(tr -d '[:space:]' < /tmp/trunk.tgz.sha256)
+          actual=$(sha256sum /tmp/trunk.tgz | cut -d ' ' -f1)
+          test "${#expected}" -eq 64
+          test "$actual" = "$expected"
+          mkdir -p /tmp/trunk-release
+          tar -xzf /tmp/trunk.tgz -C /tmp/trunk-release
+          trunk_bin=$(find /tmp/trunk-release -type f -name trunk -print -quit)
+          test -n "$trunk_bin"
+          install -m 755 "$trunk_bin" "$HOME/.cargo/bin/trunk"
+          trunk --version
+      - name: Build local RoFormer WASM and its three workers
+        working-directory: third_party/stemyla/app
+        shell: bash
+        run: trunk build --release --public-url ./
+      - name: Verify built app is complete and contains NO model weights
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s third_party/stemyla/app/dist/index.html
+          wasm_count=$(find third_party/stemyla/app/dist -name '*.wasm' -type f | wc -l)
+          test "$wasm_count" -ge 4
+          ! find third_party/stemyla/app/dist -type f \( -name '*.safetensors' -o -name '*.ckpt' -o -name '*.pth' \) | grep .
+          mkdir -p roformer-bundle/studio roformer-bundle/notices
+          cp -a third_party/stemyla/app/dist/. roformer-bundle/studio/
+          cp third_party/stemyla/LICENSE-APACHE roformer-bundle/notices/
+          cp third_party/stemyla/LICENSE-MIT roformer-bundle/notices/
+          cp third_party/stemyla/THIRD-PARTY.md roformer-bundle/notices/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: roformer-controlled-webgpu-assets
+          path: roformer-bundle/
+          retention-days: 14
+          if-no-files-found: error
+
+
+  controlled-portable:
+    needs: webgpu-studio
+    name: Bundle controlled pinned WASM, verified normalized Demucs, and KindlingControl
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install and run app/IPC/security regression tests
+        shell: pwsh
+        run: |
+          npm ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check desktop/main.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check desktop/roformer-studio.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check desktop/preload.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check src/app/stem-panel.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check src/app/roformer-inline.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check src/app/stem-compare.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check src/app/stem-mixer.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check src/app/audio-panel.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check src/app/roformer-transfer.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check desktop/roformer-transfer-bridge.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check tools/install-roformer-transfer.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check src/app/roformer-controls.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # Built from pinned Stemyla commit b2a771808d36f9a8d2f333528805d0ee2c1040a8;
+      # its WebAssembly job passed even though the downstream Windows job
+      # originally failed on a Windows short/long-path alias in a unit test.
+      - uses: actions/download-artifact@v4
+        with:
+          name: roformer-controlled-webgpu-assets
+          path: build/roformer-package
+
+      # Source-built normalized Demucs from pinned demucs-rs v0.3.5 and the
+      # tested 0.6.2 global-normalizer patch. Its published Portable is an
+      # embedded 7z SFX archive containing resources/demucs/demucs.exe.
+      - uses: actions/download-artifact@v4
+        with:
+          repository: darow462-cloud/kindling-control-spark-amps
+          run-id: 44856514299
+          name: KindlingControl-Stems062-GlobalNorm-Win-x64
+          github-token: ${{ github.token }}
+          path: build/normalized062
+
+      - name: Verify independent WASM workers and extract the pinned native engine
+        shell: pwsh
+        run: |
+          Move-Item build/roformer-package/studio build/roformer-studio
+          Move-Item build/roformer-package/notices build/roformer-notices
+          # Add a KindlingControl-owned read-only OPFS bridge to the pinned
+          # Stemyla HTML. Never change pinned WASM or redistribute weights.
+          node tools/install-roformer-transfer.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $wasm = @(Get-ChildItem build/roformer-studio -Recurse -Filter *.wasm -File)
+          if ($wasm.Count -ne 4) { throw "Expected 4 pinned WASM modules, got $($wasm.Count)" }
+          $portable = @(Get-ChildItem build/normalized062 -Recurse -Filter *.exe -File)
+          if ($portable.Count -ne 1) { throw "Expected exactly one 0.6.2 Portable EXE" }
+          $seven = "C:\Program Files\7-Zip\7z.exe"
+          if (!(Test-Path $seven)) { throw "7-Zip is missing from Windows runner" }
+          $destination = Join-Path $PWD "build/normalized-extracted"
+          New-Item -ItemType Directory -Force -Path $destination | Out-Null
+          # The Electron Portable EXE is an NSIS wrapper around an embedded
+          # genuine 7z payload. 7-Zip treats the wrapper as NSIS and hides
+          # nested resource names; extract the verified payload first.
+          $bytes = [System.IO.File]::ReadAllBytes($portable[0].FullName)
+          $signature = [byte[]]@(0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c)
+          $offset = 0
+          $start = -1
+          while ($offset -lt $bytes.Length - 6) {
+            $candidate = [Array]::IndexOf($bytes, [byte]0x37, $offset)
+            if ($candidate -lt 0) { break }
+            if ($bytes[$candidate + 1] -eq $signature[1] -and
+                $bytes[$candidate + 2] -eq $signature[2] -and
+                $bytes[$candidate + 3] -eq $signature[3] -and
+                $bytes[$candidate + 4] -eq $signature[4] -and
+                $bytes[$candidate + 5] -eq $signature[5]) {
+              $start = $candidate
+              break
+            }
+            $offset = $candidate + 1
+          }
+          if ($start -lt 0) { throw "Embedded 7z payload not found" }
+          $payload = Join-Path $destination "verified-normalized-062.7z"
+          $writer = [System.IO.File]::Create($payload)
+          try { $writer.Write($bytes, $start, $bytes.Length - $start) }
+          finally { $writer.Dispose() }
+          & $seven x $payload "-o$destination" "resources/demucs/demucs.exe" "resources/demucs/LICENSE.txt" -y
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $native = Join-Path $destination "resources/demucs/demucs.exe"
+          $license = Join-Path $destination "resources/demucs/LICENSE.txt"
+          if (!(Test-Path $native) -or !(Test-Path $license)) { throw "Normalized native engine missing from verified Portable" }
+          $hash = (Get-FileHash $native -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($hash -ne "4bb4d08b86861dd0146de283d20b0539856a186b07345b1f7e619dbf9b6fee95") {
+            throw "Normalized Demucs SHA256 mismatch: $hash"
+          }
+          New-Item -ItemType Directory -Force -Path build/bin | Out-Null
+          Copy-Item $native build/bin/demucs.exe
+          Copy-Item $license build/bin/LICENSE.txt
+          node tools/make-roformer-builder-config.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node tools/stamp-version.js 0.7.5-controls.1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build independent Windows Portable with two real models
+        shell: pwsh
+        run: >
+          npx electron-builder --config build/roformer-electron-builder.json
+          --win portable --x64 --publish never
+          --config.extraMetadata.version=0.7.5-controls.1
+          --config.productName="KindlingControl RoFormer Controls 0.7.5 Test"
+          --config.appId=dev.darow462.kindlingcontrol.roformer075controls
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KindlingControl-RoFormer075-Controls-Portable-Win-x64
+          path: dist/*.exe
+          if-no-files-found: error
+          retention-days: 14
