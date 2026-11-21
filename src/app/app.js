@@ -1370,6 +1370,11 @@ initStemPanel({
     await audioPanel.loadSeparatedGuitar(stem);
     selectTab($('#tab-analysis'));
   },
+  onAnalyzeImportedGuitar: async (file) => {
+    if (!audioPanel) throw new Error('Audio analysis is unavailable in this build.');
+    await audioPanel.loadImportedGuitar(file);
+    selectTab($('#tab-analysis'));
+  },
 });
 
 // ---------------------------------------------------------------------------
