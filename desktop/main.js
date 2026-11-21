@@ -5,6 +5,7 @@
 import { app, BrowserWindow, dialog, ipcMain, net, protocol, shell } from 'electron';
 import { existsSync } from 'node:fs';
 import { StemSeparationService } from './stem-service.js';
+import { StemClipStore, readSelectedAudioForTrim } from './stem-clip-store.js';
 import { ROFORMER_ORIGIN, resolveStudioResource } from './roformer-studio.js';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { join, normalize, sep } from 'node:path';
@@ -34,6 +35,7 @@ let mainWindow = null;
 let stemInput = null;
 let stemOutput = null;
 let stemService = null;
+const stemClipStore = new StemClipStore();
 
 function studioResourcesRoot() {
   return app.isPackaged
@@ -101,7 +103,7 @@ function createWindow() {
   const query = process.argv.includes('--mock') ? '?mock=Spark%20GO' : '';
   win.loadURL(`${SCHEME}://app/index.html${query}`);
   mainWindow = win;
-  win.once('closed', () => { stemService?.close(); if (mainWindow === win) mainWindow = null; });
+  win.once('closed', () => { stemService?.close(); void stemClipStore.clear(); if (mainWindow === win) mainWindow = null; });
   return win;
 }
 
@@ -226,8 +228,28 @@ app.whenReady().then(() => {
       filters: [{ name: 'Audio', extensions: ['wav', 'aiff', 'aif', 'mp3', 'flac', 'ogg', 'm4a', 'aac'] }],
     });
     if (picker.canceled || !picker.filePaths.length) return null;
+    if (stemService.active || stemService.starting) throw new Error('Separation is in progress.');
+    await stemClipStore.clear();
     stemInput = picker.filePaths[0];
     return { name: stemInput.split(/[\\/]/).at(-1), path: stemInput };
+  });
+  ipcMain.handle('stem:read-input', async (event) => {
+    if (!trustedMain(event)) throw new Error('Untrusted app window');
+    if (!stemInput) throw new Error('Choose an audio file first.');
+    return readSelectedAudioForTrim(stemInput);
+  });
+  ipcMain.handle('stem:prepare-clip', async (event, bytes) => {
+    if (!trustedMain(event)) throw new Error('Untrusted app window');
+    if (!stemInput || stemService.active || stemService.starting) {
+      throw new Error('Select a source and wait for the current job to finish.');
+    }
+    return stemClipStore.prepare(bytes);
+  });
+  ipcMain.handle('stem:clear-clip', async (event) => {
+    if (!trustedMain(event)) throw new Error('Untrusted app window');
+    if (stemService.active || stemService.starting) throw new Error('Separation in progress.');
+    await stemClipStore.clear();
+    return true;
   });
   ipcMain.handle('stem:choose-output', async (event) => {
     if (!trustedMain(event)) throw new Error('Untrusted app window');
@@ -253,7 +275,7 @@ app.whenReady().then(() => {
       throw new Error('Invalid separation settings');
     }
     return stemService.start({
-      inputPath: stemInput, outputRoot: stemOutput,
+      inputPath: stemClipStore.path || stemInput, outputRoot: stemOutput,
       mode: options.mode, protectPeaks: options.protectPeaks,
     });
   });
