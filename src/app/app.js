@@ -1363,7 +1363,30 @@ tabs.forEach((t, i) => {
 
 // Local audio analysis and native stem separation remain independent of the
 // Spark transport. A completed guitar stem may be loaded as a reference.
-const audioPanel = initAudioPanel();
+const audioPanel = initAudioPanel($('#panel-analysis'), {
+  onApplyGeneratedPreset: async (preset) => {
+    // This generator is intentionally Spark 2-only. When offline it creates
+    // a local editable draft; when connected it uploads to the temporary live
+    // slot, never a stored hardware preset, and leaves Save to the user.
+    if (toneBusy) throw new Error('Finish the current tone operation first.');
+    if (state.connected && !/\\bspark[\\s-]*2\\b/i.test($('#i-name').textContent)) {
+      throw new Error('Connect Spark 2. Automatic reference presets are not enabled for other Spark models.');
+    }
+    if (state.unsaved && state.preset &&
+        !confirm('Replace the current unsaved live tone with this suggested Spark 2 preset?')) {
+      return false;
+    }
+    const draft = { ...structuredClone(preset), uuid: randomUuid() };
+    await makeLive(draft);
+    state.unsaved = true;
+    renderPresetHeader();
+    selectTab($('#tab-tone'));
+    toast(state.connected
+      ? 'Suggested preset loaded into Spark 2 temporary slot. Use Save to keep it.'
+      : 'Suggested preset opened locally in Tone. Connect Spark 2 to try it; use Save to keep it.');
+    return true;
+  },
+});
 initStemPanel({
   onAnalyzeGuitar: async (stem) => {
     if (!audioPanel) throw new Error('Audio analysis is unavailable in this build.');
