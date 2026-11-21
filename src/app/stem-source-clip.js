@@ -297,6 +297,13 @@ export function initSourceClip({
   refresh();
   return {
     loadSource,
+    clearSource() {
+      ++epoch;
+      releaseSource();
+      root.hidden = false;
+      refresh();
+      say('Source changed. Waveform preview is optional; full-song separation remains available.');
+    },
     getSource: () => source ? { engine: source.engine, name: source.name } : null,
     getRange: () => ({ start, end, duration }),
     canSeparate(engine) {
