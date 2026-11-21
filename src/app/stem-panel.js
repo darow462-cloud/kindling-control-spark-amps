@@ -32,8 +32,19 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
       for (const audio of $('stem-track-list').querySelectorAll('audio')) audio.pause();
     },
   });
-  const roformerControls = initRoFormerControls({ root, frame: $('stem-roformer-frame') });
-  const roformerTransfer = initRoFormerTransfer({
+  let roformerTransfer = null;
+  const roformerControls = initRoFormerControls({
+    root,
+    frame: $('stem-roformer-frame'),
+    onCompleted: ({ session }) => {
+      if (!roformerTransfer?.importCompleted(session)) {
+        const status = $('stem-mixer-transfer-status');
+        status.textContent = 'Auto-import could not start. Use Import directly from RoFormer after the workspace is ready.';
+        status.dataset.kind = 'error';
+      }
+    },
+  });
+  roformerTransfer = initRoFormerTransfer({
     root: $('stem-mixer'),
     frame: $('stem-roformer-frame'),
     onFiles: (files) => mixer?.loadRoFormerFiles(files) ?? 0,
