@@ -22,6 +22,9 @@ export function kc_next() {
 export function kc_ack(nonce, ok, message) {
   globalThis.__kindlingControl?.ack?.(nonce, ok, message);
 }
+export function kc_completed(nonce, session) {
+  globalThis.__kindlingControl?.completed?.(nonce, session);
+}
 export function kc_report(modelReady, modelLoading, downloadDone, downloadTotal,
     separating, progressDone, progressTotal, songLoaded, canSeparate, stopped, text) {
   globalThis.__kindlingControl?.report?.(modelReady, modelLoading,
@@ -33,6 +36,7 @@ extern "C" {
     fn kc_available() -> bool;
     fn kc_next() -> wasm_bindgen::JsValue;
     fn kc_ack(nonce: &str, ok: bool, message: &str);
+    fn kc_completed(nonce: &str, session: &str);
     fn kc_report(
         model_ready: bool,
         model_loading: bool,
@@ -102,8 +106,17 @@ impl StemApp {
                         && self.separating.is_none()
                     {
                         self.start_separation(ctx);
-                        accepted = true;
-                        "Started Stemyla's native WebGPU separation.".into()
+                        accepted = self.separating.is_some();
+                        if accepted {
+                            if let Some(session) = self.session.clone() {
+                                self.kindling_run = Some((nonce.clone(), session));
+                            }
+                        }
+                        if accepted {
+                            "Started Stemyla's native WebGPU separation.".into()
+                        } else {
+                            "RoFormer could not start separation.".into()
+                        }
                     } else {
                         "RoFormer needs a loaded model and song, with no running job.".into()
                     }
@@ -154,6 +167,83 @@ def patch(path: Path) -> None:
         original,
         "impl eframe::App for StemApp {",
         RUST_BRIDGE + "impl eframe::App for StemApp {",
+    )
+    # Associate a completion with the command nonce and the exact source
+    # session. A normal Advanced Studio run clears this association first.
+    changed = replace_once(
+        changed,
+        "    /// The song the running separation was started on.\n"
+        "    #[cfg(target_arch = \"wasm32\")]\n"
+        "    separating: Option<SeparationJob>,",
+        "    /// The user-initiated Kindling run (nonce, source session).\n"
+        "    #[cfg(target_arch = \"wasm32\")]\n"
+        "    kindling_run: Option<(String, String)>,\n"
+        "    /// The song the running separation was started on.\n"
+        "    #[cfg(target_arch = \"wasm32\")]\n"
+        "    separating: Option<SeparationJob>,",
+    )
+    changed = replace_once(
+        changed,
+        "            #[cfg(target_arch = \"wasm32\")]\n"
+        "            separating: None,",
+        "            #[cfg(target_arch = \"wasm32\")]\n"
+        "            kindling_run: None,\n"
+        "            #[cfg(target_arch = \"wasm32\")]\n"
+        "            separating: None,",
+    )
+    changed = replace_once(
+        changed,
+        "    fn start_separation(&mut self, ctx: &egui::Context) {\n",
+        "    fn start_separation(&mut self, ctx: &egui::Context) {\n"
+        "        // Only a specifically accepted Kindling action can auto-import.\n"
+        "        // A manual Stemyla run invalidates any earlier tag.\n"
+        "        self.kindling_run = None;\n",
+    )
+    changed = replace_once(
+        changed,
+        "        let destination = job.destination(self.song_serial, self.session.as_deref());\n"
+        "        let being_opened = self.opening.as_ref().is_some_and(|(_, o)| *o == id);\n"
+        "        let read = destination == StemsGo::Show || being_opened;",
+        "        let kindling_done = self.kindling_run.take()\n"
+        "            .filter(|(_, expected)| expected == &id);\n"
+        "        let destination = job.destination(self.song_serial, self.session.as_deref());\n"
+        "        let being_opened = self.opening.as_ref().is_some_and(|(_, o)| *o == id);\n"
+        "        let read = destination == StemsGo::Show || being_opened;",
+    )
+    changed = replace_once(
+        changed,
+        "            let kept = stored.kept.is_ok();\n"
+        "            let not_kept = stored",
+        "            let kept = stored.kept.is_ok();\n"
+        "            // Signal only after the final WAVs AND meta have been\n"
+        "            // committed by Stemyla (never on a worker 'done' alone).\n"
+        "            if kept {\n"
+        "                if let Some((nonce, _)) = kindling_done {\n"
+        "                    kc_completed(&nonce, &id);\n"
+        "                }\n"
+        "            }\n"
+        "            let not_kept = stored",
+    )
+    changed = replace_once(
+        changed,
+        "        if let Some(id) = job.session.clone().filter(|_| job.keeps_stems) {\n"
+        "            let destination = job.destination(self.song_serial, self.session.as_deref());",
+        "        if let Some(id) = job.session.clone().filter(|_| job.keeps_stems) {\n"
+        "            let kindling_done = self.kindling_run.take()\n"
+        "                .filter(|(_, expected)| expected == &id);\n"
+        "            let destination = job.destination(self.song_serial, self.session.as_deref());",
+    )
+    changed = replace_once(
+        changed,
+        "                let status = match store::save_stems(&id, SEPARATION_RATE, &to_save).await {\n"
+        "                    Ok(()) => kept,",
+        "                let status = match store::save_stems(&id, SEPARATION_RATE, &to_save).await {\n"
+        "                    Ok(()) => {\n"
+        "                        if let Some((nonce, _)) = kindling_done {\n"
+        "                            kc_completed(&nonce, &id);\n"
+        "                        }\n"
+        "                        kept\n"
+        "                    },",
     )
     changed = replace_once(
         changed,
