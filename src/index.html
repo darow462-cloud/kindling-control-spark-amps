@@ -159,6 +159,15 @@
           <p class="hint">The model download is optional and requires an explicit click. Its original licence grant is unclear. No weights are packaged, and no download starts automatically.</p>
           <progress id="stem-roformer-control-progress" max="100" hidden></progress>
           <p id="stem-roformer-control-status" class="stem-status" role="status" aria-live="polite">Open the Stems tab to connect to RoFormer.</p>
+          <div class="stem-roformer-health">
+            <div class="stem-roformer-health-actions">
+              <button id="stem-roformer-check-health" type="button">Check RoFormer setup</button>
+              <button id="stem-roformer-copy-health" type="button" disabled>Copy diagnostic</button>
+              <span class="hint">Checks the local studio, not GPU inference. No audio, file paths or song titles are collected.</span>
+            </div>
+            <p id="stem-roformer-health-status" class="stem-status" role="status" aria-live="polite">Run this check if the model, controls or WAV import do not respond.</p>
+            <pre id="stem-roformer-health-report" class="stem-roformer-health-report" aria-label="Local RoFormer diagnostic result"></pre>
+          </div>
         </div>
         <div class="stem-roformer-advanced-toolbar">
           <button type="button" id="stem-roformer-advanced-toggle"
