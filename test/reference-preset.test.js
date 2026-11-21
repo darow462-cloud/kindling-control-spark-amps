@@ -95,5 +95,6 @@ test('reference-only generation is reachable in Analyze without requiring the Yo
   assert.match(panel, /generateReferencePreset\(tracks\.reference\.profile/);
   assert.match(panel, /presetToJson\(preset\)/);
   assert.match(app, /onApplyGeneratedPreset: async/);
-  assert.match(app, /load into the temporary live slot/);
+  assert.match(app, /await makeLive\\(draft\\)/);
+  assert.match(app, /TEMP_SLOT/);
 });
