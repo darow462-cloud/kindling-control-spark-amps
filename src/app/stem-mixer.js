@@ -2,6 +2,7 @@
 // URLs; RoFormer remains an isolated WebGPU studio and its WAVs are explicitly
 // selected by the user. No model control, filesystem bridge or audio upload.
 import { formatStemTime, isLocalWav } from './stem-compare.js';
+import { normalizedClip } from './stem-trim-utils.js';
 
 export const MIX_STEMS = Object.freeze(['drums', 'bass', 'vocals', 'guitar', 'piano', 'other']);
 export const MIX_LABELS = Object.freeze({
@@ -38,6 +39,7 @@ export function initStemMixer({
   documentRef = document,
   urlApi = URL,
   onPlay = () => {},
+  onSourcesChanged = () => {},
   onAnalyzeDemucs = null,
   onAnalyzeRoFormer = null,
 } = {}) {
@@ -67,6 +69,7 @@ export function initStemMixer({
   let disposed = false;
   let generation = 0;
   let requestedPosition = 0;
+  let previewEnd = null;
 
   function say(message, kind = '') {
     if (disposed) return;
@@ -74,6 +77,10 @@ export function initStemMixer({
     status.dataset.kind = kind;
   }
   function selected() { return banks[active]; }
+  function activeSources() {
+    return MIX_STEMS.filter((name) => selected().has(name))
+      .map((name) => ({ name, url: selected().get(name).url }));
+  }
   function firstPlayer() {
     const name = MIX_STEMS.find((n) => selected().has(n));
     return name ? players[name] : null;
@@ -129,6 +136,7 @@ export function initStemMixer({
   function pauseAll() {
     ++generation;
     playing = false;
+    previewEnd = null;
     for (const player of Object.values(players)) player.pause();
     refresh();
   }
@@ -162,6 +170,7 @@ export function initStemMixer({
     }
     setPosition(positionSeconds);
     refresh();
+    onSourcesChanged({ mode: active, sources: activeSources() });
   }
   function chooseBank(mode) {
     if (disposed || !banks[mode] || mode === active) return;
@@ -176,9 +185,10 @@ export function initStemMixer({
     pauseAll();
     setPosition(0);
   }
-  async function togglePlayback() {
+  async function togglePlayback(keepPreviewRange = false) {
     if (disposed || !selected().size) return;
     if (playing) { pauseAll(); return; }
+    if (!keepPreviewRange) previewEnd = null;
     const items = MIX_STEMS.filter((name) => selected().has(name));
     if (!items.length) return;
     const now = position();
@@ -299,6 +309,12 @@ export function initStemMixer({
       const master = firstPlayer();
       if (playing && master === player) {
         requestedPosition = position();
+        if (previewEnd !== null && master.currentTime >= previewEnd - 0.025) {
+          const stoppedAt = previewEnd;
+          pauseAll();
+          setPosition(stoppedAt);
+          return;
+        }
         for (const otherName of MIX_STEMS) {
           if (name === otherName || !selected().has(otherName)) continue;
           const other = players[otherName];
@@ -373,7 +389,21 @@ export function initStemMixer({
     loadRoFormerFiles: loadFiles,
     getActive: () => active,
     getLoadedNames: (mode = active) => [...(banks[mode]?.keys() ?? [])],
+    getActiveSources: activeSources,
+    getDuration: duration,
     getMuted: (name) => players[name]?.muted,
+    previewRange(start, end) {
+      const max = duration();
+      if (!selected().size || !max) return false;
+      try {
+        const range = normalizedClip(start, end, max);
+        pauseAll();
+        setPosition(range.start);
+        previewEnd = range.end;
+        void togglePlayback(true);
+        return true;
+      } catch { return false; }
+    },
     pause: pauseAll,
     dispose() {
       if (disposed) return;
