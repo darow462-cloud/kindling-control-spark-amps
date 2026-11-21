@@ -69,8 +69,10 @@ export class StemClipStore {
     // a fresh isolated temporary folder and a fixed output basename.
     const directory=await mkdtemp(join(this.root,'kindling-stem-clip-'));
     const path=join(directory,'selected-clip.wav');
+    const bytes=value instanceof ArrayBuffer ? Buffer.from(value) :
+      Buffer.from(value.buffer,value.byteOffset,value.byteLength);
     try {
-      await writeFile(path,value,{flag:'wx'});
+      await writeFile(path,bytes,{flag:'wx'});
       await this.clear();
       this.directory=directory;
       this.path=path;
