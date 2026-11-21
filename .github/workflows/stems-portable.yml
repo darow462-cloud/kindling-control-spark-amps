@@ -1,8 +1,20 @@
-name: KindlingControl 0.6 Six Stems Windows Portable (experimental)
+name: KindlingControl 0.6.2 Global-Norm Stems Windows Portable (experimental)
 
-# Manual fallback when the upstream v0.3.5 artifact has expired.
-# Source compilation is expensive; routine pushes use the verified prebuilt.
+# This specific experiment must compile patched native Rust source. No change to
+# the verified upstream prebuilt workflow or stable Windows versions.
 on:
+  push:
+    branches:
+      - fix/v0.6.2-demucs-global-normalization
+    paths:
+      - '.github/workflows/stems-portable.yml'
+      - 'desktop/**'
+      - 'src/**'
+      - 'test/**'
+      - 'tools/patch-demucs-normalization.py'
+      - 'tools/make-stem-builder-config.js'
+      - 'package.json'
+      - 'package-lock.json'
   workflow_dispatch:
 
 permissions:
@@ -36,6 +48,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
           node --check desktop/stem-service.js
           if ($LASTEXITCODE -ne 0) { exit 1 }
+          node --check desktop/stem-peakguard.js
+          if ($LASTEXITCODE -ne 0) { exit 1 }
           node --check src/app/app.js
           if ($LASTEXITCODE -ne 0) { exit 1 }
           node --check src/app/stem-panel.js
@@ -53,6 +67,14 @@ jobs:
             throw "demucs-rs revision mismatch: $commit"
           }
 
+      - name: Patch pinned Rust engine with whole-track input normalization
+        shell: pwsh
+        run: |
+          python tools/patch-demucs-normalization.py demucs-rs/demucs-cli/src/separate.rs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s tools -p "test_demucs_normalization.py"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
@@ -64,7 +86,7 @@ jobs:
       - name: Install Vulkan SDK (matching upstream Windows release)
         uses: humbletim/install-vulkan-sdk@v1.2
 
-      - name: Compile pinned six-stem native engine (Vulkan / wgpu)
+      - name: Compile globally normalized native engine (Vulkan / wgpu)
         shell: pwsh
         working-directory: demucs-rs
         run: |
@@ -79,7 +101,7 @@ jobs:
           Copy-Item demucs-rs/LICENSE build/bin/LICENSE.txt -ErrorAction Stop
           node tools/make-stem-builder-config.js
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          node tools/stamp-version.js 0.6.0-stems.1
+          node tools/stamp-version.js 0.6.2-globalnorm.1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build standalone Windows Portable with native stem separation
@@ -87,13 +109,13 @@ jobs:
         run: >
           npx electron-builder --config build/stem-electron-builder.json
           --win portable --x64 --publish never
-          --config.extraMetadata.version=0.6.0-stems.1
-          --config.productName="KindlingControl Six Stems 0.6 Test"
-          --config.appId=dev.darow462.kindlingcontrol.stems06
+          --config.extraMetadata.version=0.6.2-globalnorm.1
+          --config.productName="KindlingControl Normalized Stems 0.6.2 Test"
+          --config.appId=dev.darow462.kindlingcontrol.stems062norm
 
       - uses: actions/upload-artifact@v4
         with:
-          name: KindlingControl-Stems06-Portable-Win-x64
+          name: KindlingControl-Stems062-GlobalNorm-Win-x64
           path: dist/*.exe
           if-no-files-found: error
           retention-days: 14
