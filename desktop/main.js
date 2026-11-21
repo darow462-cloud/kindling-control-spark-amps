@@ -34,7 +34,6 @@ let mainWindow = null;
 let stemInput = null;
 let stemOutput = null;
 let stemService = null;
-let roformerStudioWindow = null;
 
 function studioResourcesRoot() {
   return app.isPackaged
@@ -42,26 +41,13 @@ function studioResourcesRoot() {
     : fileURLToPath(new URL('../build/roformer-studio/', import.meta.url));
 }
 
-function openRoformerStudio() {
-  if (roformerStudioWindow && !roformerStudioWindow.isDestroyed()) {
-    roformerStudioWindow.focus();
-    return;
-  }
-  if (!existsSync(join(studioResourcesRoot(), 'index.html'))) {
-    throw new Error('RoFormer WebGPU studio is not bundled in this build.');
-  }
-  const win = new BrowserWindow({
-    width: 1360, height: 890, minWidth: 760, minHeight: 540,
-    title: 'KindlingControl · BS-RoFormer Studio (experimental)',
-    backgroundColor: '#1b1b1b', autoHideMenuBar: true,
-    webPreferences: {
-      contextIsolation: true, sandbox: true,
-      nodeIntegration: false, webSecurity: true,
-    },
-  });
-  roformerStudioWindow = win;
-  win.once('closed', () => { if (roformerStudioWindow === win) roformerStudioWindow = null; });
-  win.loadURL(`${ROFORMER_ORIGIN}/index.html`);
+function bundledRoformerStatus() {
+  // This is a fixed read-only status. The renderer cannot choose a local
+  // file, URL, executable or second browser window.
+  return {
+    available: existsSync(join(studioResourcesRoot(), 'index.html')),
+    url: `${ROFORMER_ORIGIN}/index.html`,
+  };
 }
 
 function trustedMain(event) {
@@ -155,10 +141,10 @@ app.on('web-contents-created', (_e, contents) => {
     return { action: 'deny' };
   });
   contents.on('will-navigate', (e, url) => {
-    const nativeApp = url.startsWith(`${SCHEME}:`);
-    const studioPage = contents === roformerStudioWindow?.webContents &&
-      url.startsWith(`${ROFORMER_ORIGIN}/`);
-    if (!nativeApp && !studioPage) {
+    // RoFormer now runs only inside a sandboxed iframe under the Stems tab,
+    // never as the top-level page or another BrowserWindow.
+    const nativeApp = url.startsWith(`${SCHEME}://app/`);
+    if (!nativeApp) {
       e.preventDefault();
       if (url.startsWith('https:')) shell.openExternal(url);
     }
@@ -205,10 +191,9 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.handle('roformer:open', async (event) => {
+  ipcMain.handle('roformer:status', async (event) => {
     if (!trustedMain(event)) throw new Error('Untrusted app window');
-    openRoformerStudio();
-    return true;
+    return bundledRoformerStatus();
   });
 
   protocol.handle(STEM_SCHEME, async (req) => {
