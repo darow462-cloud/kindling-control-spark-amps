@@ -1,6 +1,7 @@
 // Windows-only six-stem playback UI. All OS filesystem and subprocess actions
 // go through the narrow kindlingDesktop.stems preload bridge.
 import { initInlineRoformer } from './roformer-inline.js';
+import { initStemCompare } from './stem-compare.js';
 
 const fmtSize = (size) => `${(size / (1024 * 1024)).toFixed(1)} MB`;
 
@@ -11,6 +12,12 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
   const supported = !!api?.supported;
   const warn = $('stem-support-warning');
   warn.hidden = supported;
+  const compare = initStemCompare({
+    root: $('stem-compare'),
+    onPlay: () => {
+      for (const audio of $('stem-track-list').querySelectorAll('audio')) audio.pause();
+    },
+  });
   const state = { file: null, output: null, running: false, stems: [], activeId: null,
     mode: 'standard', peak: null };
 
@@ -79,6 +86,7 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
       player.setAttribute('aria-label', `Listen to ${stem.label}`);
       // Single-track audition: starting a player pauses the other instruments.
       player.addEventListener('play', () => {
+        compare?.pause();
         for (const other of list.querySelectorAll('audio')) {
           if (other !== player) other.pause();
         }
@@ -87,6 +95,8 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
       list.append(article);
     }
     $('stem-results').hidden = !state.stems.length;
+    const guitar = state.stems.find((stem) => stem.name === 'guitar');
+    if (guitar) compare?.setDemucs(guitar);
     updateButtons();
   }
 
@@ -188,6 +198,7 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
   window.addEventListener('pagehide', () => {
     dispose();
     inlineRoformer?.dispose();
+    compare?.dispose();
     clearPlayers();
   }, { once: true });
   updateButtons();
