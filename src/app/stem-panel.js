@@ -5,6 +5,7 @@ import { initStemCompare } from './stem-compare.js';
 import { initStemMixer } from './stem-mixer.js';
 import { initRoFormerTransfer } from './roformer-transfer.js';
 import { initRoFormerControls } from './roformer-controls.js';
+import { initRoFormerHealth } from './roformer-health.js';
 
 const fmtSize = (size) => `${(size / (1024 * 1024)).toFixed(1)} MB`;
 
@@ -55,6 +56,9 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
       }
       return imported;
     },
+  });
+  const roformerHealth = initRoFormerHealth({
+    root, frame: $('stem-roformer-frame'), controls: roformerControls, mixer,
   });
   const state = { file: null, output: null, running: false, stems: [], activeId: null,
     mode: 'standard', peak: null };
@@ -242,6 +246,7 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
     mixer?.dispose();
     roformerTransfer?.dispose();
     roformerControls?.dispose();
+    roformerHealth?.dispose();
     clearPlayers();
   }, { once: true });
   updateButtons();
