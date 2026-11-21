@@ -168,6 +168,11 @@ export function initStemExportClip({
   }
   function updateRange(a,b) {
     if (!duration || busy) return;
+    if (!Number.isFinite(a) || !Number.isFinite(b)) {
+      say('Enter finite numeric start and end times.', true);
+      refresh();
+      return;
+    }
     const minimum=Math.min(0.1,duration/2);
     start=Math.max(0,Math.min(duration-minimum,a));
     end=Math.max(start+minimum,Math.min(duration,b));
