@@ -393,8 +393,8 @@
         </section>
       </div>
       <section class="analysis-preset-generator" aria-labelledby="analysis-preset-title">
-        <h3 id="analysis-preset-title">Generate Spark 2 preset from reference</h3>
-        <p class="hint">Reference only — no guitar recording required. A local, experimental frequency/dynamics heuristic proposes an editable Spark 2 tone. It cannot identify the exact original amp, cabinet, microphone or distortion from mastered audio.</p>
+        <h3 id="analysis-preset-title">Tone Match — Spark 2 candidate presets</h3>
+        <p class="hint">Reference only — your guitar recording is not required. Analyze a separated guitar stem and compare multiple distinct Spark 2 amp/effect starting points. They are uncalibrated suggestions, not an exact recreation or measured amp fingerprints.</p>
         <div class="analysis-preset-toolbar">
           <label for="analysis-preset-style">Tone character
             <select id="analysis-preset-style">
@@ -406,10 +406,13 @@
           </label>
           <button type="button" id="analysis-preset-generate" disabled>Regenerate</button>
           <button type="button" id="analysis-preset-apply" class="primary" disabled>Load into Spark 2 editor</button>
-          <button type="button" id="analysis-preset-export" disabled>Export preset JSON</button>
+          <button type="button" id="analysis-preset-export" disabled>Export selected preset JSON</button>
         </div>
-        <p id="analysis-preset-status" class="analysis-status" role="status" aria-live="polite">Load a guitar reference above to generate a first-pass Spark 2 preset automatically.</p>
-        <ul id="analysis-preset-details" class="analysis-advice" aria-label="Suggested preset settings"></ul>
+        <p id="analysis-preset-status" class="analysis-status" role="status" aria-live="polite">Load a guitar reference above to generate candidate Spark 2 presets automatically.</p>
+        <div id="analysis-preset-options" class="analysis-preset-options" role="radiogroup" aria-label="Choose a suggested Spark 2 preset"></div>
+        <ul id="analysis-preset-details" class="analysis-advice" aria-label="Selected preset settings"></ul>
+        <h4 class="analysis-preset-warnings-title">Analysis notes and limits</h4>
+        <ul id="analysis-preset-warnings" class="analysis-advice" aria-label="Analysis limitations"></ul>
         <p class="hint">The suggestion is not written to a hardware preset slot automatically. Loading it in Tone applies it to the temporary live slot when Spark 2 is connected; use Save only if you choose to keep it.</p>
       </section>
       <section class="analysis-results" aria-label="Audio spectrum comparison">
