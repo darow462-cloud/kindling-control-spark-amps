@@ -1263,3 +1263,86 @@ dialog.help-dialog[open] { display: flex; }
   .stem-roformer-health { padding: 0.5rem; }
   .stem-roformer-health-actions button { width: 100%; }
 }
+
+
+/* --- 0.7.8: non-destructive source/stem audio clip editors ------------------- */
+.stem-clip-editor, .stem-mixer-clips {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  background: var(--surface-2);
+  min-width: 0;
+}
+.stem-clip-editor[hidden] { display: none; }
+.stem-clip-editor h3, .stem-mixer-clips h3 { margin: 0; }
+.stem-clip-editor .hint, .stem-mixer-clips .hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 0;
+}
+.stem-clip-waveform {
+  width: 100%;
+  height: 112px;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: #192632;
+  touch-action: none;
+  cursor: ew-resize;
+}
+.stem-clip-range-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 0.75rem;
+}
+.stem-clip-range-grid > label {
+  display: grid;
+  grid-template-columns: auto minmax(0,1fr) 5.5rem;
+  gap: 0.45rem;
+  align-items: center;
+  font-size: 0.83rem;
+}
+.stem-clip-range-grid input[type="range"] { min-width: 0; width: 100%; }
+.stem-clip-range-grid input[type="number"] { width: 100%; min-width: 0; }
+.stem-clip-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.stem-clip-duration {
+  color: var(--muted);
+  font-size: 0.79rem;
+  font-variant-numeric: tabular-nums;
+}
+.stem-mixer-clips { margin-top: 1rem; }
+.stem-mixer-clips-waveforms {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+.stem-mixer-clip-row {
+  display: grid;
+  grid-template-columns: 76px minmax(0,1fr);
+  gap: 0.5rem;
+  align-items: center;
+  min-width: 0;
+  font-size: 0.79rem;
+}
+.stem-mixer-clip-row canvas {
+  width: 100%;
+  height: 36px;
+  background: #192632;
+  border-radius: 0.2rem;
+}
+#stem-source-trim-status[data-kind="error"],
+#stem-mixer-clips-status[data-kind="error"] {
+  color: var(--led);
+}
+@media (width < 750px) {
+  .stem-clip-range-grid { grid-template-columns: minmax(0,1fr); }
+  .stem-clip-editor, .stem-mixer-clips { padding: 0.55rem; }
+  .stem-clip-range-grid > label { grid-template-columns: 40px minmax(0,1fr) 5rem; }
+  .stem-mixer-clip-row { grid-template-columns: 59px minmax(0,1fr); }
+}
