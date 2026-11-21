@@ -47,7 +47,14 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
   roformerTransfer = initRoFormerTransfer({
     root: $('stem-mixer'),
     frame: $('stem-roformer-frame'),
-    onFiles: (files) => mixer?.loadRoFormerFiles(files) ?? 0,
+    onFiles: (files) => {
+      const imported = mixer?.loadRoFormerFiles(files) ?? 0;
+      if (imported > 0) {
+        const guitar = Array.from(files).find((file) => /^guitar\.wav$/i.test(file.name));
+        if (guitar) compare?.setRoFormer(guitar);
+      }
+      return imported;
+    },
   });
   const state = { file: null, output: null, running: false, stems: [], activeId: null,
     mode: 'standard', peak: null };
