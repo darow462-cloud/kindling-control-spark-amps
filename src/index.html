@@ -139,6 +139,33 @@
         <button type="button" id="stem-engine-roformer" aria-pressed="true" class="active">BS-RoFormer SW · guitar</button>
         <button type="button" id="stem-engine-demucs" aria-pressed="false">HTDemucs · classic</button>
       </div>
+      <section id="stem-source-clip" class="stem-clip-editor" aria-labelledby="stem-source-clip-title" hidden>
+        <h3 id="stem-source-clip-title">Trim source before separation</h3>
+        <p class="hint">Non-destructive: choose a short musical passage before running either engine. The original song stays unchanged. Waveforms support mono/stereo files up to 180 MB and 15 minutes.</p>
+        <p id="stem-source-name" class="stem-file-label">Choose an audio file in either engine</p>
+        <canvas id="stem-source-waveform" class="stem-clip-waveform" width="900" height="112"
+          aria-label="Source audio waveform with selected start and end handles"></canvas>
+        <div class="stem-clip-range-grid">
+          <label>Start
+            <input id="stem-source-start" type="range" min="0" max="1000" step="1" value="0">
+            <input id="stem-source-start-number" type="number" min="0" step="0.01" value="0">
+          </label>
+          <label>End
+            <input id="stem-source-end" type="range" min="0" max="1000" step="1" value="1000">
+            <input id="stem-source-end-number" type="number" min="0" step="0.01" value="0">
+          </label>
+        </div>
+        <div class="stem-clip-actions">
+          <button id="stem-source-preview" type="button" disabled>Preview selection</button>
+          <button id="stem-source-preview-stop" type="button" disabled>Stop</button>
+          <button id="stem-source-apply" type="button" class="primary" disabled>Apply clip to separator</button>
+          <button id="stem-source-reset" type="button" disabled>Use full original</button>
+          <span id="stem-source-duration" class="stem-clip-duration">0:00 selected</span>
+        </div>
+        <p id="stem-source-trim-status" class="stem-status" role="status" aria-live="polite">
+          Select a song in Demucs or RoFormer to display its waveform.
+        </p>
+      </section>
       <section id="stem-roformer-pane" class="stem-roformer-integrated" aria-labelledby="stem-engine-roformer">
         <div class="stem-roformer-heading">
           <strong>BS-RoFormer SW</strong>
@@ -263,6 +290,28 @@
           <span id="stem-mixer-clock">0:00 / 0:00</span>
         </div>
         <p id="stem-mixer-status" class="stem-status" role="status" aria-live="polite">No stems loaded. Complete Demucs or import exported RoFormer WAVs.</p>
+        <section id="stem-mixer-clips" class="stem-mixer-clips" aria-labelledby="stem-mixer-clips-title">
+          <h3 id="stem-mixer-clips-title">Trim all six separated tracks</h3>
+          <p class="hint">One shared start and end for all six stems, keeping them aligned. Select a passage and export six PCM16 WAVs together as ZIP. Original separated files and mixer settings remain unchanged. Maximum length: 15 minutes.</p>
+          <div class="stem-clip-actions">
+            <button type="button" id="stem-mixer-clips-load" disabled>Load six waveforms</button>
+            <button type="button" id="stem-mixer-clips-preview" disabled>Preview selected mix</button>
+            <button type="button" id="stem-mixer-clips-export" class="primary" disabled>Export six clipped WAVs (ZIP)</button>
+          </div>
+          <div id="stem-mixer-clips-waveforms" class="stem-mixer-clips-waveforms"></div>
+          <div class="stem-clip-range-grid">
+            <label>Start
+              <input id="stem-mixer-clips-start" type="range" min="0" max="1000" value="0">
+              <input id="stem-mixer-clips-start-number" type="number" min="0" step="0.01" value="0">
+            </label>
+            <label>End
+              <input id="stem-mixer-clips-end" type="range" min="0" max="1000" value="1000">
+              <input id="stem-mixer-clips-end-number" type="number" min="0" step="0.01" value="0">
+            </label>
+          </div>
+          <p id="stem-mixer-clips-selected" class="stem-clip-duration">Load all six WAV waveforms to select a segment.</p>
+          <p id="stem-mixer-clips-status" class="stem-status" role="status" aria-live="polite">Load separated tracks to enable clipping.</p>
+        </section>
       </section>
       <section id="stem-compare" class="stem-compare" aria-labelledby="stem-compare-title">
         <h3 id="stem-compare-title">Compare guitar stems · A/B</h3>
