@@ -99,11 +99,49 @@ export function analyzePcm({
   }
   const rms = Math.sqrt(sumSquares / (frames * actualChannels.length));
 
+  // Measure envelope consistency using short RMS windows instead of inferring
+  // distortion solely from global peak-to-RMS crest factor. Note boundaries,
+  // palm mutes and edited/limited stems can affect this descriptor.
+  const envelopeStep = Math.max(128, Math.round(sampleRate * 0.02));
+  const envelope = [];
+  for (let offset = start; offset < end; offset += envelopeStep) {
+    const to = Math.min(end, offset + envelopeStep);
+    let powerSum = 0;
+    for (const channel of actualChannels) {
+      for (let i = offset; i < to; i++) {
+        const v = Number.isFinite(channel[i]) ? channel[i] : 0;
+        powerSum += v * v;
+      }
+    }
+    envelope.push(Math.sqrt(powerSum / ((to - offset) * actualChannels.length)));
+  }
+  const active = envelope.filter(v => v >= 0.005).sort((a, b) => a - b);
+  const percentile = (values, p) =>
+    values.length ? values[Math.min(values.length - 1, Math.floor((values.length - 1) * p))] : 0;
+  const envelopeContrastDb = active.length >= 4
+    ? 20 * Math.log10(Math.max(percentile(active, 0.90), EPS) /
+      Math.max(percentile(active, 0.50), EPS)) : 0;
+
+  // Near-zero / negative correlation is a caution for stereo layering or
+  // separation artefacts, not a confident count of guitars.
+  let stereoCorrelation = null;
+  if (actualChannels.length === 2) {
+    const left = actualChannels[0], right = actualChannels[1];
+    let cross = 0, ll = 0, rr = 0;
+    for (let i = start; i < end; i++) {
+      const a = Number.isFinite(left[i]) ? left[i] : 0;
+      const b = Number.isFinite(right[i]) ? right[i] : 0;
+      cross += a * b; ll += a * a; rr += b * b;
+    }
+    stereoCorrelation = ll > EPS && rr > EPS ? Math.max(-1, Math.min(1, cross / Math.sqrt(ll * rr))) : null;
+  }
+
   const power = new Float64Array(fftSize / 2 + 1);
   const hann = Float64Array.from({ length: fftSize }, (_, i) => 0.5 * (1 - Math.cos(2 * Math.PI * i / (fftSize - 1))));
   const availableStarts = Math.max(0, frames - fftSize);
   const windowCount = Math.min(maxWindows, Math.max(1, Math.ceil(frames / fftSize)));
   let processed = 0;
+  const spectralFlatnessWindows = [];
   for (let k = 0; k < windowCount; k++) {
     const windowStart = start + (windowCount === 1 ? 0 : Math.round(availableStarts * k / (windowCount - 1)));
     for (const channel of actualChannels) {
@@ -113,6 +151,23 @@ export function analyzePcm({
         if (sample < end) real[i] = (Number.isFinite(channel[sample]) ? channel[sample] : 0) * hann[i];
       }
       const values = fftPower(real);
+      // Spectral flatness of individual short-time windows is more useful than
+      // the flatness of the time-averaged spectrum (which smears changing notes).
+      let sumLinear = 0, sumLog = 0, count = 0, maxBin = 0;
+      const binLow = Math.max(1, Math.ceil(500 * fftSize / sampleRate));
+      const binHigh = Math.min(values.length - 1, Math.floor(8000 * fftSize / sampleRate));
+      for (let i = binLow; i <= binHigh; i++) maxBin = Math.max(maxBin, values[i]);
+      if (maxBin > EPS) {
+        const noiseFloor = Math.max(EPS, maxBin * 1e-8);
+        for (let i = binLow; i <= binHigh; i++) {
+          const p = Math.max(noiseFloor, values[i]);
+          sumLinear += p;
+          sumLog += Math.log(p);
+          count++;
+        }
+        if (count) spectralFlatnessWindows.push(Math.min(1,
+          Math.exp(sumLog / count) / (sumLinear / count)));
+      }
       for (let i = 1; i < values.length; i++) power[i] += values[i];
       processed++;
     }
@@ -140,6 +195,25 @@ export function analyzePcm({
     }
   }
   const averagePower = spectrumPower.map((v, i) => v / Math.max(1, spectrumCounts[i]));
+  const sortedFlatness = spectralFlatnessWindows.sort((a, b) => a - b);
+  const spectralFlatness = percentile(sortedFlatness, 0.5);
+  // Rolloff: upper frequency below which 95% of 80 Hz–12 kHz energy lies.
+  let rolloffHz = 0, cumulative = 0, eligibleEnergy = 0;
+  for (let i = 1; i < power.length; i++) {
+    const freq = i * sampleRate / fftSize;
+    if (freq >= 80 && freq <= 12000) eligibleEnergy += power[i];
+  }
+  if (eligibleEnergy > EPS) {
+    for (let i = 1; i < power.length; i++) {
+      const freq = i * sampleRate / fftSize;
+      if (freq < 80 || freq > 12000) continue;
+      cumulative += power[i];
+      if (cumulative >= eligibleEnergy * 0.95) {
+        rolloffHz = freq;
+        break;
+      }
+    }
+  }
   const strongest = Math.max(...averagePower, EPS);
   const spectrum = strongest <= EPS
     ? Array(SPECTRUM_POINTS).fill(-75) // never display silence as a flat 0 dB peak
@@ -152,6 +226,10 @@ export function analyzePcm({
     peakDb: db(peak),
     crestDb: rms > EPS ? 20 * Math.log10(peak / rms) : 0,
     centroidHz: totalPower > EPS ? weightedFrequency / totalPower : 0,
+    envelopeContrastDb,
+    spectralFlatness,
+    rolloffHz,
+    stereoCorrelation,
     bands: AUDIO_BANDS.map((band, i) => ({
       ...band,
       percent: totalPower > EPS ? (100 * bandPowers[i] / totalPower) : 0,
