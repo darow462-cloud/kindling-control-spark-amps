@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld('kindlingDesktop', {
   stems: {
     supported: process.platform === 'win32',
     chooseInput: () => ipcRenderer.invoke('stem:choose-input'),
+    readInput: () => ipcRenderer.invoke('stem:read-input'),
+    prepareClip: (wavBytes) => ipcRenderer.invoke('stem:prepare-clip', wavBytes),
+    clearClip: () => ipcRenderer.invoke('stem:clear-clip'),
     chooseOutput: () => ipcRenderer.invoke('stem:choose-output'),
     start: (settings) => ipcRenderer.invoke('stem:start', settings),
     cancel: () => ipcRenderer.invoke('stem:cancel'),
