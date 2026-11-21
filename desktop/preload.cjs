@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld('kindlingDesktop', {
     supported: process.platform === 'win32',
     chooseInput: () => ipcRenderer.invoke('stem:choose-input'),
     chooseOutput: () => ipcRenderer.invoke('stem:choose-output'),
-    start: () => ipcRenderer.invoke('stem:start'),
+    start: (settings) => ipcRenderer.invoke('stem:start', settings),
     cancel: () => ipcRenderer.invoke('stem:cancel'),
     openOutput: () => ipcRenderer.invoke('stem:open-output'),
     onEvent: (callback) => {
