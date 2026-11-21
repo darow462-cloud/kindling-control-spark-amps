@@ -226,7 +226,7 @@ by Rust/egui, not exposed as ordinary DOM controls:
   draws a waveform and offers draggable boundaries and exact second
   inputs. Preview plays only the selected interval. **Apply clip to
   separator** creates a short PCM16 WAV locally with 5 ms edge fades.
-  The original source is never overwritten.
+  The original source is never overwritten. A separate **Export source clip (WAV)** action saves the same selected segment locally without changing either separator input.
 - For native Demucs, the renderer can ask main Electron to read *only
   the audio file previously chosen through the native file dialog*.
   A new narrow IPC `stem:prepare-clip` accepts bounded validated
