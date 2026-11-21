@@ -392,6 +392,26 @@
           <input type="range" id="analysis-guitar-position" min="0" max="0" step="0.5" value="0" disabled>
         </section>
       </div>
+      <section class="analysis-preset-generator" aria-labelledby="analysis-preset-title">
+        <h3 id="analysis-preset-title">Generate Spark 2 preset from reference</h3>
+        <p class="hint">Reference only — no guitar recording required. A local, experimental frequency/dynamics heuristic proposes an editable Spark 2 tone. It cannot identify the exact original amp, cabinet, microphone or distortion from mastered audio.</p>
+        <div class="analysis-preset-toolbar">
+          <label for="analysis-preset-style">Tone character
+            <select id="analysis-preset-style">
+              <option value="auto">Automatic estimate</option>
+              <option value="clean">Clean</option>
+              <option value="crunch">Crunch</option>
+              <option value="high-gain">High gain</option>
+            </select>
+          </label>
+          <button type="button" id="analysis-preset-generate" disabled>Regenerate</button>
+          <button type="button" id="analysis-preset-apply" class="primary" disabled>Load into Spark 2 editor</button>
+          <button type="button" id="analysis-preset-export" disabled>Export preset JSON</button>
+        </div>
+        <p id="analysis-preset-status" class="analysis-status" role="status" aria-live="polite">Load a guitar reference above to generate a first-pass Spark 2 preset automatically.</p>
+        <ul id="analysis-preset-details" class="analysis-advice" aria-label="Suggested preset settings"></ul>
+        <p class="hint">The suggestion is not written to a hardware preset slot automatically. Loading it in Tone applies it to the temporary live slot when Spark 2 is connected; use Save only if you choose to keep it.</p>
+      </section>
       <section class="analysis-results" aria-label="Audio spectrum comparison">
         <h3>Normalized spectrum</h3>
         <p class="hint">Each curve is normalized to its own strongest frequency band. Compare shape, not absolute recording volume. A reference with drums and bass will not be guitar-only.</p>
