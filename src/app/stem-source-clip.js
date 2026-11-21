@@ -267,6 +267,9 @@ export function initSourceClip({
       return !!source && source.engine === engine &&
         (busy || isTrimmed() && !isApplied() || !isTrimmed() && !!applied);
     },
+    warnNeedsApply() {
+      say('The current range is not applied. Click Apply clip to separator, or Use full original.', 'error');
+    },
     dispose() {
       disposed = true;
       ++epoch;
