@@ -6,6 +6,8 @@ import { initStemMixer } from './stem-mixer.js';
 import { initRoFormerTransfer } from './roformer-transfer.js';
 import { initRoFormerControls } from './roformer-controls.js';
 import { initRoFormerHealth } from './roformer-health.js';
+import { initSourceClip } from './stem-source-clip.js';
+import { initStemExportClip } from './stem-export-clip.js';
 
 const fmtSize = (size) => `${(size / (1024 * 1024)).toFixed(1)} MB`;
 
@@ -17,6 +19,8 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
   const warn = $('stem-support-warning');
   warn.hidden = supported;
   let mixer = null;
+  let sourceClip = null;
+  let stemExportClip = null;
   const compare = initStemCompare({
     root: $('stem-compare'),
     onPlay: () => {
@@ -28,6 +32,7 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
     root: $('stem-mixer'),
     onAnalyzeDemucs: onAnalyzeGuitar,
     onAnalyzeRoFormer: onAnalyzeImportedGuitar,
+    onSourcesChanged: (sourceSet) => stemExportClip?.sourcesChanged(sourceSet),
     onPlay: () => {
       compare?.pause();
       for (const audio of $('stem-track-list').querySelectorAll('audio')) audio.pause();
@@ -37,6 +42,12 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
   const roformerControls = initRoFormerControls({
     root,
     frame: $('stem-roformer-frame'),
+    onSourceSelected: (file) => { void sourceClip?.loadSource({engine: 'roformer',file}); },
+    onBeforeSeparate: () => {
+      const okay = sourceClip?.canSeparate('roformer') ?? true;
+      if (!okay) sourceClip?.warnNeedsApply();
+      return okay;
+    },
     onCompleted: ({ session }) => {
       if (!roformerTransfer?.importCompleted(session)) {
         const status = $('stem-mixer-transfer-status');
@@ -60,6 +71,21 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
   const roformerHealth = initRoFormerHealth({
     root, frame: $('stem-roformer-frame'), controls: roformerControls, mixer,
   });
+  sourceClip = initSourceClip({
+    root: $('stem-source-clip'),
+    onDemucsApply: async (wav) => {
+      if (!api?.prepareClip) throw new Error('Clip preparation is unavailable in this Portable.');
+      await api.prepareClip(new Uint8Array(await wav.arrayBuffer()));
+    },
+    onDemucsRestore: async () => { await api?.clearClip?.(); },
+    onRoFormerApply: (file) => roformerControls.loadClip(file),
+    onRoFormerRestore: (file) => roformerControls.loadClip(file),
+  });
+  stemExportClip = initStemExportClip({
+    root: $('stem-mixer-clips'), mixer,
+  });
+  stemExportClip?.sourcesChanged({ mode: mixer?.getActive() ?? 'demucs',
+    sources: mixer?.getActiveSources() ?? [] });
   const state = { file: null, output: null, running: false, stems: [], activeId: null,
     mode: 'standard', peak: null };
 
@@ -88,6 +114,21 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
       if (type === 'file') {
         state.file = selected;
         $('stem-file-label').textContent = selected.name;
+        if (api?.readInput) {
+          try {
+            const audio = await api.readInput();
+            if (audio?.bytes) {
+              void sourceClip?.loadSource({
+                engine: 'demucs',
+                file: new File([audio.bytes], audio.name, {type: 'application/octet-stream'}),
+              });
+            }
+          } catch (error) {
+            const notice = $('stem-source-trim-status');
+            notice.textContent = 'Waveform preview unavailable: ' + error.message +
+              '. Full-song separation remains available.';
+          }
+        }
       } else {
         state.output = selected;
         $('stem-output-label').textContent = selected.path;
@@ -146,6 +187,11 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
 
   async function start() {
     if (state.running) return;
+    if (sourceClip && !sourceClip.canSeparate('demucs')) {
+      sourceClip.warnNeedsApply();
+      status('Apply the selected source clip or restore the full song before separation.', 'error');
+      return;
+    }
     state.running = true;
     state.stems = [];
     state.peak = null;
@@ -247,6 +293,8 @@ export function initStemPanel({ root = document.getElementById('panel-stems'), o
     roformerTransfer?.dispose();
     roformerControls?.dispose();
     roformerHealth?.dispose();
+    sourceClip?.dispose();
+    stemExportClip?.dispose();
     clearPlayers();
   }, { once: true });
   updateButtons();
