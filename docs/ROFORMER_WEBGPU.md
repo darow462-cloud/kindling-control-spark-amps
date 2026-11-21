@@ -21,8 +21,8 @@ model for comparison when Demucs guitar is muffled or bleeds into other stems.
 
 ## User workflow
 
-1. Open **Stems → Open RoFormer studio…** in the experimental Windows Portable.
-2. Inside the separate studio window, click **Download model** if you accept
+1. Open **Stems → BS-RoFormer SW · guitar** in the experimental Windows Portable. The RoFormer workspace opens within the existing tab, without a new window.
+2. Inside the embedded workspace, click **Download model** if you accept
    the checkpoint terms (internet required only for that initial download).
 3. Open your source song. Separate into 6 stems.
 4. Solo the guitar lane to compare with the Demucs output and listen for lost
