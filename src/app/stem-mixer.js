@@ -70,6 +70,16 @@ export function initStemMixer({
   let generation = 0;
   let requestedPosition = 0;
   let previewEnd = null;
+  const transportListeners = new Set();
+  function notifyTransport() {
+    if (disposed) return;
+    const snapshot = {
+      time: position(), duration: duration(), playing, mode: active,
+    };
+    for (const callback of transportListeners) {
+      try { callback(snapshot); } catch { /* listener must not interrupt playback */ }
+    }
+  }
 
   function say(message, kind = '') {
     if (disposed) return;
@@ -132,6 +142,7 @@ export function initStemMixer({
     seek.disabled = !length;
     seek.value = length ? String(Math.max(0, Math.min(1000, Math.round(now / length * 1000)))) : '0';
     clock.textContent = formatStemTime(now) + ' / ' + formatStemTime(length);
+    notifyTransport();
   }
   function pauseAll() {
     ++generation;
@@ -392,17 +403,37 @@ export function initStemMixer({
     getActiveSources: activeSources,
     getDuration: duration,
     getMuted: (name) => players[name]?.muted,
-    previewRange(start, end) {
+    previewRange(start, end, from = start) {
       const max = duration();
       if (!selected().size || !max) return false;
       try {
         const range = normalizedClip(start, end, max);
+        const playFrom = Number.isFinite(from) && from >= range.start && from < range.end - 0.015
+          ? from : range.start;
         pauseAll();
-        setPosition(range.start);
+        setPosition(playFrom);
         previewEnd = range.end;
         void togglePlayback(true);
         return true;
       } catch { return false; }
+    },
+    getPosition: position,
+    isPlaying: () => playing,
+    seekTo(seconds) {
+      const length = duration();
+      if (disposed || !Number.isFinite(seconds) || length <= 0) return false;
+      const target = Math.max(0, Math.min(length, seconds));
+      if (playing && previewEnd !== null && target >= previewEnd - 0.015) {
+        pauseAll();
+      }
+      setPosition(target);
+      return true;
+    },
+    subscribeTransport(callback) {
+      if (disposed || typeof callback !== 'function') return () => {};
+      transportListeners.add(callback);
+      callback({ time: position(), duration: duration(), playing, mode: active });
+      return () => transportListeners.delete(callback);
     },
     pause: pauseAll,
     dispose() {
@@ -412,6 +443,7 @@ export function initStemMixer({
       clearAudio();
       releaseBank('demucs');
       releaseBank('roformer');
+      transportListeners.clear();
     },
   };
 }
