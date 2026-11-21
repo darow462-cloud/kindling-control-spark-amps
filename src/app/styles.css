@@ -1225,3 +1225,41 @@ dialog.help-dialog[open] { display: flex; }
   min-height: 540px;
   pointer-events: none;
 }
+
+
+/* ---- RoFormer 0.7.7: on-demand, privacy-safe runtime diagnostic ------------- */
+.stem-roformer-health {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: var(--surface-2);
+}
+.stem-roformer-health-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.stem-roformer-health-actions .hint {
+  flex: 1 1 16rem;
+  font-size: 0.77rem;
+}
+.stem-roformer-health-report {
+  max-height: 20rem;
+  overflow: auto;
+  padding: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  background: var(--surface);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 0.76rem/1.5 ui-monospace, Consolas, monospace;
+}
+.stem-roformer-health-report:empty { display: none; }
+#stem-roformer-health-status[data-kind="error"] { color: var(--led); }
+@media (width < 550px) {
+  .stem-roformer-health { padding: 0.5rem; }
+  .stem-roformer-health-actions button { width: 100%; }
+}
