@@ -78,6 +78,71 @@
     return stems;
   }
 
+  // User-driven control channel for a *locally rebuilt* pinned Stemyla WASM.
+  // The Rust app polls this queue from its normal UI frame and calls its
+  // existing model/song/separation methods. JS never reaches into egui canvas
+  // coordinates, triggers an automatic model download or opens arbitrary files.
+  const controlQueue = [];
+  let lastState = '';
+  let lastStateSent = -Infinity;
+  const COMMAND = 'kindling.roformer.control.command.v1';
+  const ACK = 'kindling.roformer.control.ack.v1';
+  const STATE = 'kindling.roformer.control.state.v1';
+  const SOURCE_AUDIO = /\.(wav|aiff|aif|flac|mp3|ogg|m4a|aac)$/i;
+  window.__kindlingControl = {
+    available: true,
+    take() { return controlQueue.shift() ?? null; },
+    ack(nonce, ok, message) {
+      window.parent.postMessage({ type: ACK, nonce, ok, message }, '*');
+    },
+    report(modelReady, modelLoading, downloadDone, downloadTotal,
+      separating, progressDone, progressTotal, songLoaded, canSeparate, stopped, text) {
+      const state = {
+        modelReady, modelLoading, downloadDone, downloadTotal, separating,
+        progressDone, progressTotal, songLoaded, canSeparate, stopped,
+        text: String(text || '').slice(0, 240),
+      };
+      const serialized = JSON.stringify(state);
+      const now = performance.now();
+      if (serialized !== lastState || now - lastStateSent >= 2000) {
+        lastState = serialized;
+        lastStateSent = now;
+        window.parent.postMessage({ type: STATE, state }, '*');
+      }
+    },
+  };
+
+  window.addEventListener('message', (event) => {
+    if (window.parent === window || event.source !== window.parent ||
+        !['kindling://app', 'null'].includes(event.origin)) return;
+    const data = event.data;
+    if (!data || data.type !== COMMAND ||
+        typeof data.nonce !== 'string' ||
+        !/^[a-zA-Z0-9-]{16,80}$/.test(data.nonce) ||
+        !['open_song', 'download_model', 'separate'].includes(data.action)) return;
+    if (controlQueue.length >= 2) {
+      window.parent.postMessage({
+        type: ACK, nonce: data.nonce, ok: false,
+        message: 'Another RoFormer action is still pending.',
+      }, '*');
+      return;
+    }
+    if (data.action === 'open_song') {
+      const file = data.file;
+      if (!(file instanceof File) || !SOURCE_AUDIO.test(file.name) ||
+          file.size < 1 || file.size > 350 * 1024 * 1024) {
+        window.parent.postMessage({
+          type: ACK, nonce: data.nonce, ok: false,
+          message: 'Choose a supported audio file under 350 MB.',
+        }, '*');
+        return;
+      }
+      controlQueue.push({ action: 'open_song', file, nonce: data.nonce });
+    } else {
+      controlQueue.push({ action: data.action, nonce: data.nonce });
+    }
+  });
+
   window.addEventListener('message', async (event) => {
     if (window.parent === window || event.source !== window.parent ||
         !['kindling://app', 'null'].includes(event.origin)) return;
