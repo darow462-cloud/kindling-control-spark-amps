@@ -1369,7 +1369,7 @@ const audioPanel = initAudioPanel($('#panel-analysis'), {
     // a local editable draft; when connected it uploads to the temporary live
     // slot, never a stored hardware preset, and leaves Save to the user.
     if (toneBusy) throw new Error('Finish the current tone operation first.');
-    if (state.connected && !/\\bspark[\\s-]*2\\b/i.test($('#i-name').textContent)) {
+    if (state.connected && !/\bspark[\s-]*2\b/i.test($('#i-name').textContent)) {
       throw new Error('Connect Spark 2. Automatic reference presets are not enabled for other Spark models.');
     }
     if (state.unsaved && state.preset &&
