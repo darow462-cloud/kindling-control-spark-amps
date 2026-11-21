@@ -123,6 +123,40 @@ when browser storage fails.
   structured-cloned between frames, and that a real six-stem run loads
   all six WAVs. Unit tests cannot prove this GPU/browser integration.
 
+## Native parent controls for pinned RoFormer (0.7.5 experimental)
+
+0.7.5 introduces a **source-level** integration path, because the
+Stemyla model download, file loading and separation buttons are implemented
+by Rust/egui, not exposed as ordinary DOM controls:
+
+- In a new, isolated WebAssembly job the pinned Stemyla commit
+  `b2a771808d36f9a8d2f333528805d0ee2c1040a8` is fetched and verified.
+  The anchored script `tools/patch-stemyla-controls.py` changes only
+  its `app/src/lib.rs` to add a polling adapter. The original
+  model/inference kernels, worker protocol and model weights remain pinned
+  and unchanged. If the source layout is unexpected, the patch fails.
+- After the rebuilt studio loads, a KindlingControl-owned companion
+  `desktop/roformer-transfer-bridge.js` accepts only the three
+  allowlisted user actions `open_song`, `download_model`,
+  `separate` from the exact embedding parent origin. A bounded queue
+  exposes them to the wasm app's normal egui event loop. The Rust adapter
+  calls Stemyla's existing `open_files`, `sep.download_model` and
+  `start_separation` after checking the app's own state and reports
+  an acknowledgement, model/song availability and separation progress.
+- The new `src/app/roformer-controls.js` makes user-visible controls
+  available in the first-party Stems pane, with a 350 MB source-song
+  limit and a distinct, explicit checkpoint download button. No weight
+  download or GPU work begins on page load; no native or arbitrary
+  filesystem IPC is added. The studio's own original controls remain
+  visible as an advanced fallback.
+- This does NOT yet automatically fetch WAVs from the studio after a
+  run. Once separation completes, use the existing 0.7.4
+  **Import directly from RoFormer** button for a local OPFS import.
+  When OPFS fails, the legacy manual export/import remains available.
+- Build and unit tests confirm compilation, basic command validation and
+  packaging, but the first full Windows WebGPU/UI run is still required
+  before promoting this branch to a stable release.
+
 ## Technical boundaries
 
 - `desktop/main.js` exposes only `roformer:status` via a trusted main-app IPC, returning a fixed local URL and package availability. The renderer cannot supply file paths, CLI args, executable names or a process to launch, and no second BrowserWindow is created. `src/app/roformer-inline.js` lazy-loads the sandboxed iframe only when Stems is selected, delegates WebGPU through `allow=webgpu`, and preserves the same loaded iframe when switching back from Demucs.
