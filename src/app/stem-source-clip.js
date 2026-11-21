@@ -98,6 +98,11 @@ export function initSourceClip({
   }
   function setRange(a, b) {
     if (!duration || busy) return;
+    if (!Number.isFinite(a) || !Number.isFinite(b)) {
+      say('Enter finite numeric start and end times.', 'error');
+      refresh();
+      return;
+    }
     const step = Math.min(0.1, duration / 2);
     start = Math.max(0, Math.min(duration - step, a));
     end = Math.max(start + step, Math.min(duration, b));
