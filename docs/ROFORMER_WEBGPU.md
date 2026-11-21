@@ -40,6 +40,26 @@ Only statically packaged files can be served by that scheme. Model and song
 storage are owned by that isolated browser origin. The current integration
 does not automatically share audio files or stems with the native app.
 
+## Local A/B guitar comparison (0.7.2 experiment)
+
+- Stems now has a **Compare guitar stems · A/B** panel, visible regardless
+  of the selected separation engine. Native Demucs adds the most recently
+  completed guitar WAV to **A** through its existing session-scoped, validated
+  \`kindling-stem://\` read-only playback URL. A can also load a local WAV
+  manually if comparing earlier runs.
+- The embedded RoFormer workspace is intentionally isolated: to load **B**,
+  export its guitar stem to a WAV and select the file explicitly. No bridge
+  reads RoFormer's private storage or drives its controls behind the user's
+  back. Audio remains local and is never uploaded.
+- The comparison offers a single Play/Pause transport, Stop, a position
+  scrubber and A/B switching that transfers the current position and continues
+  playback. It does not resample, normalize, modify source WAVs, synchronize
+  multiple outputs to sample accuracy or interfere with the native Demucs
+  output folder. Browser Blob URLs for manually chosen files are revoked
+  on replacement and page close.
+- The feature is a **listening tool**: matching source songs and manually
+  matching their perceived levels remain the user's responsibility.
+
 ## Technical boundaries
 
 - `desktop/main.js` exposes only `roformer:status` via a trusted main-app IPC, returning a fixed local URL and package availability. The renderer cannot supply file paths, CLI args, executable names or a process to launch, and no second BrowserWindow is created. `src/app/roformer-inline.js` lazy-loads the sandboxed iframe only when Stems is selected, delegates WebGPU through `allow=webgpu`, and preserves the same loaded iframe when switching back from Demucs.
